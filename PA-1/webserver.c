@@ -26,6 +26,9 @@ char response[] = "HTTP/1.1 200 OK\r\n"
 
 void accept_request(int);
 int get_line(int, char *, int);
+void serve_file(int, const char *);
+void headers(int client, const char *filename);
+void cat(int client, FILE *resource);
 
 void accept_request(int client)
 {
@@ -51,12 +54,9 @@ void accept_request(int client)
 
  if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
  {
-  unimplemented(client);
+  // unimplemented(client);
   return;
  }
-
- if (strcasecmp(method, "POST") == 0)
-  cgi = 1;
 
  i = 0;
  while (ISspace(buf[j]) && (j < sizeof(buf)))
@@ -81,13 +81,13 @@ void accept_request(int client)
   }
  }
 
- sprintf(path, "htdocs%s", url);
+ sprintf(path, "www%s", url);
  if (path[strlen(path) - 1] == '/')
   strcat(path, "index.html");
  if (stat(path, &st) == -1) {
   while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
    numchars = get_line(client, buf, sizeof(buf));
-  not_found(client);
+  // not_found(client);
  }
  else
  {
@@ -99,13 +99,73 @@ void accept_request(int client)
    cgi = 1;
   if (!cgi)
    serve_file(client, path);
-  else
-   execute_cgi(client, path, method, query_string);
+  // else
+  //  execute_cgi(client, path, method, query_string);
  }
 
  close(client);
 }
 
+/**********************************************************************/
+/* Put the entire contents of a file out on a socket.  This function
+ * is named after the UNIX "cat" command, because it might have been
+ * easier just to do something like pipe, fork, and exec("cat").
+ * Parameters: the client socket descriptor
+ *             FILE pointer for the file to cat */
+/**********************************************************************/
+void cat(int client, FILE *resource)
+{
+ char buf[1024];
+
+ fgets(buf, sizeof(buf), resource);
+ while (!feof(resource))
+ {
+  send(client, buf, strlen(buf), 0);
+  fgets(buf, sizeof(buf), resource);
+ }
+}
+
+/**********************************************************************/
+/* Send a regular file to the client.  Use headers, and report
+ * errors to client if they occur.
+ * Parameters: a pointer to a file structure produced from the socket
+ *              file descriptor
+ *             the name of the file to serve */
+/**********************************************************************/
+void serve_file(int client, const char *filename)
+{
+ FILE *resource = NULL;
+ int numchars = 1;
+ char buf[1024];
+
+ buf[0] = 'A'; buf[1] = '\0';
+ while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+  numchars = get_line(client, buf, sizeof(buf));
+
+ resource = fopen(filename, "r");
+ // if (resource == NULL)
+ //  not_found(client);
+ // else
+ {
+  headers(client, filename);
+  cat(client, resource);
+ }
+ fclose(resource);
+}
+
+
+void headers(int client, const char *filename)
+{
+ char buf[1024];
+ (void)filename;  /* could use filename to determine file type */
+
+ strcpy(buf, "HTTP/1.0 200 OK\r\n");
+ send(client, buf, strlen(buf), 0);
+ sprintf(buf, "Content-Type: text/html\r\n");
+ send(client, buf, strlen(buf), 0);
+ strcpy(buf, "\r\n");
+ send(client, buf, strlen(buf), 0);
+}
 
 int get_line(int sock, char *buf, int size)
 {
@@ -144,17 +204,17 @@ int main()
 	int one = 1, client_fd;
 	pthread_t newthread;
 
-	// sockaddr: structure to contain an internet address
+	// sockaddr: structure to contain an internet address.
 	struct sockaddr_in svr_addr, cli_addr;
 	socklen_t sin_len = sizeof(cli_addr);
 
 	// create endpoint for comm, AF_INET (IPv4 Internet Protocol), 
 	// SOCK_STREAM (Provides sequenced, reliable, two-way, connection-based byte streams),
 	int sock = socket(AF_INET, SOCK_STREAM, 0); // returns file descriptor for new socket
-	if (sock < 0)
-		err(1, "cant open socket");
+	// if (sock < 0)
+		// err(1, "cant open socket");
 
-	//(int socket SOL_SOCKET to set options at socket level, allows reuse of local addresses,
+	// (int socket SOL_SOCKET to set options at socket level, allows reuse of local addresses,
 	// option value, size of socket)
 	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
 
@@ -166,7 +226,7 @@ int main()
 	// Start server
   	if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
 	    close(sock);
-	    err(1, "Can't bind");
+	    // err(1, "Can't bind");
 	  }
 	 
 	  listen(sock, 5); // 5 is backlog - limits amount of connections in socket listen queue
@@ -186,17 +246,4 @@ int main()
 			perror("pthread_create");
 	}
 	close(sock);
-
-	// while (1) {
-	// client_fd = accept(sock, (struct sockaddr *) &cli_addr, &sin_len);
-	// printf("got connection\n");
-
-	// if (client_fd == -1) {
-	//   perror("Can't accept");
-	//   continue;
-	// }
-
-	// write(client_fd, response, sizeof(response) - 1); 
-	// close(client_fd);
-	// }
 }
