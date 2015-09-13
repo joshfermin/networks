@@ -289,24 +289,41 @@ void error501(int client)
 }
 
 
-void parseConfFile()
-{
-  FILE* file = fopen("ws.conf", "r");
-  char line[256];
-  while (fgets(line, sizeof(line), file)) {
-        /* note that fgets don't strip the terminating \n, checking its
-           presence would allow to handle lines longer that sizeof(line) */
-      printf("%s", line); 
-  }
-  /* may check feof here to make a difference between eof and io failure -- network
-     timeout for instance */
-
-  fclose(file);
-}
 
 int main()
 {
-  parseConfFile();
+  ///////////////////
+  // PARSING LOGIC //
+  ///////////////////
+  FILE* file = fopen("ws.conf", "r");
+  char line[256];
+  int port;
+  // char* check;
+
+  while (fgets(line, sizeof(line), file)) {
+        /* note that fgets don't strip the terminating \n, checking its
+           presence would allow to handle lines longer that sizeof(line) */
+    // printf("%c", line[0]);
+    // printf( "%s", check );
+    if(line[0] != '#')
+    {
+      char* parse = strtok(line, " " );
+      while (parse){
+        // if(strcmp(parse, "Listen") ==0){
+          puts(parse);
+          // port = atoi(parse);       
+        // }
+        parse = strtok(NULL, " ");
+      }
+    }
+  }  
+
+  fclose(file);
+  ///////////////////
+  // PARSING LOGIC //
+  ///////////////////
+
+  printf("%d", port);
 
   int one = 1, client_fd;
   pthread_t newthread;
@@ -325,11 +342,10 @@ int main()
   // option value, size of socket)
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
 
-  int port = 8080;
   svr_addr.sin_family = AF_INET;
   svr_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
   svr_addr.sin_port = htons(port); // host to network short (htons)
-
+ 
   // Start server
     if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
       close(sock);
