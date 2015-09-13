@@ -21,8 +21,9 @@ int get_line(int, char *, int);
 void serve_file(int, const char *);
 void headers(int client, const char *filename);
 void cat(int client, FILE *resource);
-void error404(int);
+void error404(int, const char *filename);
 void error400(int);
+void error500(int);
 
 void accept_request(int client)
 {
@@ -78,7 +79,7 @@ void accept_request(int client)
   if (stat(path, &st) == -1) {
   while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
    numchars = get_line(client, buf, sizeof(buf));
-  error404(client);
+  error404(client, path);
   }
   else
   {
@@ -88,19 +89,6 @@ void accept_request(int client)
   }
 
   close(client);
-}
-
-// put all contents of a file to a client
-void cat(int client, FILE *resource)
-{
-  char buf[1024];
-
-  fgets(buf, sizeof(buf), resource);
-  while (!feof(resource))
-  {
-  send(client, buf, strlen(buf), 0);
-  fgets(buf, sizeof(buf), resource);
-  }
 }
 
 // sends a file to the client
@@ -116,13 +104,26 @@ void serve_file(int client, const char *filename)
 
   resource = fopen(filename, "r");
   if (resource == NULL)
-   error404(client);
+   error404(client, filename);
   else
   {
-  headers(client, filename);
-  cat(client, resource);
+    headers(client, filename);
+    cat(client, resource);
   }
   fclose(resource);
+}
+
+// put all contents of a file to a client
+void cat(int client, FILE *resource)
+{
+  char buf[1024];
+
+  fread(buf, 1, sizeof(buf), resource);
+  while (!feof(resource))
+  {
+  send(client, buf, strlen(buf), 0);
+  fread(buf, 1, sizeof(buf), resource);
+  }
 }
 
 // provides the client with the correct headers
@@ -131,13 +132,49 @@ void headers(int client, const char *filename)
 {
   char buf[1024];
   (void)filename;  /* could use filename to determine file type */
+  const char* filetype;
+  struct stat st; 
+  off_t size;
 
-  strcpy(buf, "HTTP/1.0 200 OK\r\n");
-  send(client, buf, strlen(buf), 0);
-  sprintf(buf, "Content-Type: text/html\r\n");
-  send(client, buf, strlen(buf), 0);
-  strcpy(buf, "\r\n");
-  send(client, buf, strlen(buf), 0);
+  if (stat(filename, &st) == 0)
+    size = st.st_size;
+
+  const char *dot = strrchr(filename, '.');
+  if(!dot || dot == filename) {
+    filetype = "";
+  } else {
+    filetype = dot + 1;
+  }
+
+  printf("%s", filetype);
+  printf("\n");
+
+  if(strcmp(filetype, "html") == 0)
+  {
+    strcpy(buf, "HTTP/1.1 200 OK\r\n");
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Type: text/html\r\n");
+    send(client, buf, strlen(buf), 0);
+    strcpy(buf, "\r\n");
+    send(client, buf, strlen(buf), 0);
+  }
+
+  else if (strcmp(filetype, "jpg") == 0)
+  {
+    printf("i got a jpg");
+    strcpy(buf, "HTTP/1.1 200 OK\r\n");
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Type: image/jpg\r\n");
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Length: %lld \r\n", size);
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Transfer-Encoding: binary\r\n");
+    send(client, buf, strlen(buf), 0);
+    strcpy(buf, "\r\n");
+    send(client, buf, strlen(buf), 0);
+  }
+
+
 }
 
 int get_line(int sock, char *buf, int size)
@@ -173,7 +210,7 @@ int get_line(int sock, char *buf, int size)
 }
 
 // tell client that content requested was not found on server
-void error404(int client)
+void error404(int client, const char *filename)
 {
   char buf[1024];
 
@@ -185,7 +222,7 @@ void error404(int client)
   send(client, buf, strlen(buf), 0);
   sprintf(buf, "<HTML><TITLE>404 NOT FOUND</TITLE>\r\n");
   send(client, buf, strlen(buf), 0);
-  sprintf(buf, "<BODY><P>Content not found on server or unavailable\r\n");
+  sprintf(buf, "<BODY><P>HTTP/1.1 404 Not Found: %s \r\n", filename);
   send(client, buf, strlen(buf), 0);
   sprintf(buf, "</BODY></HTML>\r\n");
   send(client, buf, strlen(buf), 0);
@@ -202,11 +239,26 @@ void error400(int client)
  send(client, buf, sizeof(buf), 0);
  sprintf(buf, "\r\n");
  send(client, buf, sizeof(buf), 0);
- sprintf(buf, "<P>Your browser sent a bad request, ");
+ sprintf(buf, "<P>HTTP/1.1 400 Bad Request:  Invalid Method: ");
  send(client, buf, sizeof(buf), 0);
- sprintf(buf, "such as a POST without a Content-Length.\r\n");
+ sprintf(buf, "\r\n");
  send(client, buf, sizeof(buf), 0);
 }
+
+void error500(int client)
+{
+  char buf[1024];
+
+  sprintf(buf, "HTTP/1.0 500 Internal Server Error\r\n");
+  send(client, buf, strlen(buf), 0);
+  sprintf(buf, "Content-type: text/html\r\n");
+  send(client, buf, strlen(buf), 0);
+  sprintf(buf, "\r\n");
+  send(client, buf, strlen(buf), 0);
+  sprintf(buf, "HTTP/1.1 500  Internal  Server  Error:  cannot  allocate  memory\r\n");
+  send(client, buf, strlen(buf), 0);
+}
+
 int main()
 {
   int one = 1, client_fd;
