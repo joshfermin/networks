@@ -74,7 +74,7 @@ void accept_request(int client)
   }
 
   sprintf(path, "www%s", url);
-  if (path[strlen(path) - 1] == '/')
+  if (path[strlen(path)] == '/')
   strcat(path, "index.html");
   if (stat(path, &st) == -1) {
   while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
@@ -94,23 +94,64 @@ void accept_request(int client)
 // sends a file to the client
 void serve_file(int client, const char *filename)
 {
-  FILE *resource = NULL;
-  int numchars = 1;
-  char buf[1024];
+  // FILE *resource = NULL;
+  // int numchars = 1;
+  // char buf[10000];
+  // const char* filetype;
 
-  buf[0] = 'A'; buf[1] = '\0';
-  while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-  numchars = get_line(client, buf, sizeof(buf));
+  // buf[0] = 'A'; buf[1] = '\0';
+  // while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+  // numchars = get_line(client, buf, sizeof(buf));
 
-  resource = fopen(filename, "r");
-  if (resource == NULL)
-   error404(client, filename);
-  else
+  // const char *dot = strrchr(filename, '.');
+  // if(!dot || dot == filename) {
+  //   filetype = "";
+  // } else {
+  //   filetype = dot + 1;
+  // }
+
+  // resource = fopen(filename, "r");
+  // // if (strcmp(filetype != "jpg") == 0 || strcmp(filetype != ))
+  // if (resource == NULL)
+  //  error404(client, filename);
+  // else
+  // {
+  //   headers(client, filename);
+  //   cat(client, resource);
+  // }
+  // fclose(resource);
+
+  char *sendbuf;
+  FILE *requested_file;
+  long fileLength;
+  printf("Received request for file: %s on socket %d\n\n", filename + 1, client);
+  
+  // if (fileSwitch) { requested_file = fopen(file + 1, "rb"); }
+  requested_file = fopen(filename, "rb");
+  
+  if (requested_file == NULL)
   {
-    headers(client, filename);
-    cat(client, resource);
+    error404(client, filename);
   }
-  fclose(resource);
+  else 
+  {
+    //printf("Hit else #1\n");
+    fseek (requested_file, 0, SEEK_END);
+    fileLength = ftell(requested_file);
+    rewind(requested_file);
+    
+    sendbuf = (char*) malloc (sizeof(char)*fileLength);
+    size_t result = fread(sendbuf, 1, fileLength, requested_file);
+    
+    if (result > 0) 
+    {
+      headers(client, filename);
+      send(client, sendbuf, result, 0);   
+    }   
+    else { printf("Send error."); exit(1); }
+  }
+  
+  fclose(requested_file);
 }
 
 // put all contents of a file to a client
@@ -159,12 +200,12 @@ void headers(int client, const char *filename)
     send(client, buf, strlen(buf), 0);
   }
 
-  else if (strcmp(filetype, "jpg") == 0)
+  else if (strcmp(filetype, "png") == 0)
   {
-    printf("i got a jpg");
+    printf("i got a png");
     strcpy(buf, "HTTP/1.1 200 OK\r\n");
     send(client, buf, strlen(buf), 0);
-    sprintf(buf, "Content-Type: image/jpg\r\n");
+    sprintf(buf, "Content-Type: image/png\r\n");
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Length: %lld \r\n", size);
     send(client, buf, strlen(buf), 0);
@@ -174,6 +215,20 @@ void headers(int client, const char *filename)
     send(client, buf, strlen(buf), 0);
   }
 
+  else if (strcmp(filetype, "gif") == 0)
+  {
+    printf("i got a png");
+    strcpy(buf, "HTTP/1.1 200 OK\r\n");
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Type: image/gif\r\n");
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Length: %lld \r\n", size);
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Transfer-Encoding: binary\r\n");
+    send(client, buf, strlen(buf), 0);
+    strcpy(buf, "\r\n");
+    send(client, buf, strlen(buf), 0);
+  }
 
 }
 
