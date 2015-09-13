@@ -1,5 +1,5 @@
 // code adapted from tinyhttpd-0.1.0 and rosetta code.
-
+// collaborated high level ideas with edward 
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -20,10 +20,10 @@ void accept_request(int);
 int get_line(int, char *, int);
 void serve_file(int, const char *);
 void headers(int client, const char *filename);
-void cat(int client, FILE *resource);
 void error404(int, const char *filename);
 void error400(int);
 void error500(int);
+void error501(int);
 
 void accept_request(int client)
 {
@@ -47,8 +47,8 @@ void accept_request(int client)
 
   if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
   {
-  // unimplemented(client);
-  return;
+    error501(client);
+    return;
   }
 
   i = 0;
@@ -94,33 +94,6 @@ void accept_request(int client)
 // sends a file to the client
 void serve_file(int client, const char *filename)
 {
-  // FILE *resource = NULL;
-  // int numchars = 1;
-  // char buf[10000];
-  // const char* filetype;
-
-  // buf[0] = 'A'; buf[1] = '\0';
-  // while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-  // numchars = get_line(client, buf, sizeof(buf));
-
-  // const char *dot = strrchr(filename, '.');
-  // if(!dot || dot == filename) {
-  //   filetype = "";
-  // } else {
-  //   filetype = dot + 1;
-  // }
-
-  // resource = fopen(filename, "r");
-  // // if (strcmp(filetype != "jpg") == 0 || strcmp(filetype != ))
-  // if (resource == NULL)
-  //  error404(client, filename);
-  // else
-  // {
-  //   headers(client, filename);
-  //   cat(client, resource);
-  // }
-  // fclose(resource);
-
   char *sendbuf;
   FILE *requested_file;
   long fileLength;
@@ -151,19 +124,6 @@ void serve_file(int client, const char *filename)
   }
   
   fclose(requested_file);
-}
-
-// put all contents of a file to a client
-void cat(int client, FILE *resource)
-{
-  char buf[1024];
-
-  fread(buf, 1, sizeof(buf), resource);
-  while (!feof(resource))
-  {
-  send(client, buf, strlen(buf), 0);
-  fread(buf, 1, sizeof(buf), resource);
-  }
 }
 
 // provides the client with the correct headers
@@ -308,8 +268,46 @@ void error500(int client)
   send(client, buf, strlen(buf), 0);
 }
 
+void error501(int client)
+{
+ char buf[1024];
+
+ sprintf(buf, "HTTP/1.0 501 Method Not Implemented\r\n");
+ send(client, buf, strlen(buf), 0);
+ sprintf(buf, "Content-Type: text/html\r\n");
+ send(client, buf, strlen(buf), 0);
+ sprintf(buf, "\r\n");
+ send(client, buf, strlen(buf), 0);
+ sprintf(buf, "<HTML><HEAD><TITLE>Method Not Implemented\r\n");
+ send(client, buf, strlen(buf), 0);
+ sprintf(buf, "</TITLE></HEAD>\r\n");
+ send(client, buf, strlen(buf), 0);
+ sprintf(buf, "<BODY><P>HTTP request method not supported.\r\n");
+ send(client, buf, strlen(buf), 0);
+ sprintf(buf, "</BODY></HTML>\r\n");
+ send(client, buf, strlen(buf), 0);
+}
+
+
+void parseConfFile()
+{
+  FILE* file = fopen("ws.conf", "r");
+  char line[256];
+  while (fgets(line, sizeof(line), file)) {
+        /* note that fgets don't strip the terminating \n, checking its
+           presence would allow to handle lines longer that sizeof(line) */
+      printf("%s", line); 
+  }
+  /* may check feof here to make a difference between eof and io failure -- network
+     timeout for instance */
+
+  fclose(file);
+}
+
 int main()
 {
+  parseConfFile();
+
   int one = 1, client_fd;
   pthread_t newthread;
 
