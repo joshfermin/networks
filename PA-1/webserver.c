@@ -124,7 +124,7 @@ void serve_file(int client, const char *filename)
   char *sendbuf;
   FILE *requested_file;
   long fileLength;
-  printf("Received request for file: %s on socket %d\n\n", filename + 1, client);
+  printf("Received request for file: %s on socket %d\n", filename + 1, client);
   
   // if (fileSwitch) { requested_file = fopen(file + 1, "rb"); }
   requested_file = fopen(filename, "rb");
@@ -135,7 +135,6 @@ void serve_file(int client, const char *filename)
   }
   else 
   {
-    //printf("Hit else #1\n");
     fseek (requested_file, 0, SEEK_END);
     fileLength = ftell(requested_file);
     rewind(requested_file);
@@ -187,9 +186,6 @@ void headers(int client, const char *filename)
     filetype = dot + 1;
   }
 
-  printf("%s", filetype);
-  printf("\n");
-
   if(strcmp(filetype, "html") == 0)
   {
     strcpy(buf, "HTTP/1.1 200 OK\r\n");
@@ -202,7 +198,6 @@ void headers(int client, const char *filename)
 
   else if (strcmp(filetype, "png") == 0)
   {
-    printf("i got a png");
     strcpy(buf, "HTTP/1.1 200 OK\r\n");
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Type: image/png\r\n");
@@ -217,7 +212,6 @@ void headers(int client, const char *filename)
 
   else if (strcmp(filetype, "gif") == 0)
   {
-    printf("i got a png");
     strcpy(buf, "HTTP/1.1 200 OK\r\n");
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Type: image/gif\r\n");
@@ -353,7 +347,7 @@ int main()
     client_fd = accept(sock,
                        (struct sockaddr *)&cli_addr,
                        &sin_len);
-    printf("got connection\n");
+    // printf("got connection\n");
     if (client_fd == -1)
       perror("can't accept");
     /* accept_request(client_sock); */
