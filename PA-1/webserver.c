@@ -27,6 +27,48 @@ void error501(int);
 
 void accept_request(int client)
 {
+    ///////////////////
+  // PARSING LOGIC //
+  ///////////////////
+  FILE* file = fopen("ws.conf", "r");
+  char line[256];
+  char *directoryIndex;
+  char contentType[100];
+  
+
+  while (fgets(line, sizeof(line), file)) {
+        /* note that fgets don't strip the terminating \n, checking its
+           presence would allow to handle lines longer that sizeof(line) */
+    if(line[0] != '#')
+    {
+      char* parse = strtok(line, " " );
+      // printf("%s\n", parse);
+      while (parse){
+        if(strcmp(parse, "DirectoryIndex") == 0)
+        {
+          parse = strtok(NULL, " ");
+          directoryIndex = parse;
+        }
+        else if(parse[0] == '.')
+        {
+          parse = strtok(NULL, ",");
+          strcat(contentType, parse);
+        }
+        else
+        {
+          parse = strtok(NULL, " "); 
+        }
+        
+      }
+    }
+  } 
+  fclose(file);
+  // printf("%s", contentType);
+
+   ///////////////////
+  // PARSING LOGIC //
+  ///////////////////
+
   char buf[1024];
   int numchars;
   char method[255];
@@ -73,9 +115,11 @@ void accept_request(int client)
   }
   }
 
+  // printf("%s", url);
+
   sprintf(path, "www%s", url);
   if (path[strlen(path)] == '/')
-  strcat(path, "index.html");
+  strcat(path, directoryIndex);
   if (stat(path, &st) == -1) {
   while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
    numchars = get_line(client, buf, sizeof(buf));
@@ -298,32 +342,31 @@ int main()
   FILE* file = fopen("ws.conf", "r");
   char line[256];
   int port;
-  // char* check;
 
   while (fgets(line, sizeof(line), file)) {
         /* note that fgets don't strip the terminating \n, checking its
            presence would allow to handle lines longer that sizeof(line) */
-    // printf("%c", line[0]);
-    // printf( "%s", check );
     if(line[0] != '#')
     {
       char* parse = strtok(line, " " );
+      // printf("%s\n", parse);
       while (parse){
-        // if(strcmp(parse, "Listen") ==0){
-          puts(parse);
-          // port = atoi(parse);       
-        // }
-        parse = strtok(NULL, " ");
+        if(strcmp(parse, "Listen") == 0){
+          parse = strtok(NULL, " ");
+          port = atoi(parse);
+        }
+        else
+        {
+          parse = strtok(NULL, " "); 
+        }
       }
     }
-  }  
-
+  }
   fclose(file);
   ///////////////////
   // PARSING LOGIC //
   ///////////////////
 
-  printf("%d", port);
 
   int one = 1, client_fd;
   pthread_t newthread;
