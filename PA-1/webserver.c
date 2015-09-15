@@ -8,7 +8,7 @@
 #include <strings.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <pthread.h>
+// #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
 
@@ -424,7 +424,7 @@ int main()
 
 
   int one = 1, client_fd;
-  pthread_t newthread;
+  // pthread_t newthread;
 
   // sockaddr: structure to contain an internet address.
   struct sockaddr_in svr_addr, cli_addr;
@@ -462,9 +462,9 @@ int main()
     // printf("got connection\n");
     if (client_fd == -1)
       perror("can't accept");
-    /* accept_request(client_sock); */
-    if (pthread_create(&newthread , NULL, accept_request, client_fd) != 0)
-      perror("pthread_create");
+     accept_request(client_fd); 
+    // if (pthread_create(&newthread , NULL, accept_request, client_fd) != 0)
+    //   perror("pthread_create");
   }
   close(sock);
 }
