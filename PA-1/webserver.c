@@ -140,7 +140,7 @@ void accept_request(int client)
       return;
     }
   }
-  sprintf(path, "www%s", url);
+  sprintf(path, "%s%s", document_root, url);
   if (path[strlen(path)] == '/')
   strcat(path, directoryIndex);
 // printf("%s", path);
