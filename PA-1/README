@@ -1,0 +1,8 @@
+Simple web server
+Code inspired from: tinyhttpd-0.1.0 and rosetta code.
+
+Web server currently handles: 
+	png, text, jpg, and html files
+	500, 501, 404 errors
+
+Parsing logic works for content types  and port number.
