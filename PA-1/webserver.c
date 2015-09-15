@@ -23,18 +23,26 @@ void headers(int client, const char *filename);
 void error404(int, const char *filename);
 void error400(int);
 void error500(int);
-void error501(int);
+void error501(int, const char *filename);
 
 void accept_request(int client)
 {
-    ///////////////////
+  ///////////////////
   // PARSING LOGIC //
   ///////////////////
   FILE* file = fopen("ws.conf", "r");
   char line[256];
   char *directoryIndex;
   char contentType[100];
-  
+  char *ext;
+  char buf[1024];
+  int numchars;
+  char method[255];
+  char url[255];
+  char path[512];
+  size_t i, j;
+  struct stat st;
+  char *query_string = NULL;
 
   while (fgets(line, sizeof(line), file)) {
         /* note that fgets don't strip the terminating \n, checking its
@@ -51,8 +59,8 @@ void accept_request(int client)
         }
         else if(parse[0] == '.')
         {
-          parse = strtok(NULL, ",");
           strcat(contentType, parse);
+          parse = strtok(NULL, ",");
         }
         else
         {
@@ -63,63 +71,60 @@ void accept_request(int client)
     }
   } 
   fclose(file);
-  // printf("%s", contentType);
-
-   ///////////////////
-  // PARSING LOGIC //
+  ///////////////////
+  ///////////////////
   ///////////////////
 
-  char buf[1024];
-  int numchars;
-  char method[255];
-  char url[255];
-  char path[512];
-  size_t i, j;
-  struct stat st;
-  char *query_string = NULL;
+
 
   numchars = get_line(client, buf, sizeof(buf));
   i = 0; j = 0;
+
+  // 
   while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
   {
-  method[i] = buf[j];
-  i++; j++;
+    method[i] = buf[j];
+    i++; j++;
   }
   method[i] = '\0';
 
-  if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
-  {
-    error501(client);
-    return;
-  }
-
   i = 0;
   while (ISspace(buf[j]) && (j < sizeof(buf)))
-  j++;
-  while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
-  {
-  url[i] = buf[j];
-  i++; j++;
-  }
+    j++;
+    while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
+    {
+      url[i] = buf[j];
+      i++; j++;
+    }
   url[i] = '\0';
 
   if (strcasecmp(method, "GET") == 0)
   {
-  query_string = url;
-  while ((*query_string != '?') && (*query_string != '\0'))
-   query_string++;
-  if (*query_string == '?')
-  {
-   *query_string = '\0';
-   query_string++;
-  }
+    query_string = url;
+    while ((*query_string != '?') && (*query_string != '\0'))
+     query_string++;
+    if (*query_string == '?')
+    {
+     *query_string = '\0';
+     query_string++;
+    }
   }
 
-  // printf("%s", url);
-
+  // parsing url to see file extension
+  ext = strrchr(url, '.');
+  if (ext != NULL) {
+    // printf("comparing contentType: %s with ext: %s", contentType, ext);
+    if(strstr(contentType, ext) == NULL)
+    {
+      error501(client, url);
+      return;
+    }
+  }
+  // printf("%s\n", path);
   sprintf(path, "www%s", url);
   if (path[strlen(path)] == '/')
   strcat(path, directoryIndex);
+// printf("%s\n", path);
   if (stat(path, &st) == -1) {
   while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
    numchars = get_line(client, buf, sizeof(buf));
@@ -129,6 +134,7 @@ void accept_request(int client)
   {
   if ((st.st_mode & S_IFMT) == S_IFDIR)
    strcat(path, "/index.html");
+ // printf("%s\n", path);
    serve_file(client, path);
   }
 
@@ -200,6 +206,15 @@ void headers(int client, const char *filename)
     send(client, buf, strlen(buf), 0);
   }
 
+  else if(strcmp(filetype, "text") == 0)
+  {
+    strcpy(buf, "HTTP/1.1 200 OK\r\n");
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Type: text/plain\r\n");
+    send(client, buf, strlen(buf), 0);
+    strcpy(buf, "\r\n");
+    send(client, buf, strlen(buf), 0);
+  }
   else if (strcmp(filetype, "png") == 0)
   {
     strcpy(buf, "HTTP/1.1 200 OK\r\n");
@@ -312,11 +327,11 @@ void error500(int client)
   send(client, buf, strlen(buf), 0);
 }
 
-void error501(int client)
+void error501(int client, const char *filename)
 {
  char buf[1024];
 
- sprintf(buf, "HTTP/1.0 501 Method Not Implemented\r\n");
+ sprintf(buf, "HTTP/1.1 501 Method Not Implemented\r\n");
  send(client, buf, strlen(buf), 0);
  sprintf(buf, "Content-Type: text/html\r\n");
  send(client, buf, strlen(buf), 0);
@@ -326,7 +341,7 @@ void error501(int client)
  send(client, buf, strlen(buf), 0);
  sprintf(buf, "</TITLE></HEAD>\r\n");
  send(client, buf, strlen(buf), 0);
- sprintf(buf, "<BODY><P>HTTP request method not supported.\r\n");
+ sprintf(buf, "<BODY><P>HTTP/1.1 501  Not Implemented:  %s\r\n", filename);
  send(client, buf, strlen(buf), 0);
  sprintf(buf, "</BODY></HTML>\r\n");
  send(client, buf, strlen(buf), 0);
@@ -379,7 +394,7 @@ int main()
   // SOCK_STREAM (Provides sequenced, reliable, two-way, connection-based byte streams),
   int sock = socket(AF_INET, SOCK_STREAM, 0); // returns file descriptor for new socket
   // if (sock < 0)
-    // err(1, "cant open socket");
+  //   err(1, "cant open socket");
 
   // (int socket SOL_SOCKET to set options at socket level, allows reuse of local addresses,
   // option value, size of socket)
