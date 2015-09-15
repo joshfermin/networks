@@ -152,8 +152,8 @@ void accept_request(int client)
   else
   {
   if ((st.st_mode & S_IFMT) == S_IFDIR)
-   strcat(path,"/");
-   strcat(path,directoryIndex);
+   strcat(path,"/index.html");
+   // strcat(path,directoryIndex);
    serve_file(client, path);
   }
 
