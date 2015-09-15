@@ -18,6 +18,7 @@ void accept_request(int);
 int get_line(int, char *, int);
 void serve_file(int, const char *);
 void headers(int client, const char *filename);
+char * deblank(char *string);
 void error404(int, const char *filename);
 void error400(int, char* type);
 void error500(int);
@@ -25,13 +26,10 @@ void error501(int, const char *filename);
 
 void accept_request(int client)
 {
-  ///////////////////
-  // PARSING LOGIC //
-  ///////////////////
   FILE* file = fopen("ws.conf", "r");
   char line[256];
-  char *directoryIndex;
-  char *document_root;
+  char directoryIndex[100];
+  char document_root[100];
   char contentType[100];
   char *ext;
   char buf[1024];
@@ -42,24 +40,29 @@ void accept_request(int client)
   size_t i, j;
   struct stat st;
   char *query_string = NULL;
-
+  ///////////////////
+  ///PARSING LOGIC///
+  ///////////////////
   while (fgets(line, sizeof(line), file)) {
         /* note that fgets don't strip the terminating \n, checking its
            presence would allow to handle lines longer that sizeof(line) */
     if(line[0] != '#')
     {
       char* parse = strtok(line, " " );
-      // printf("%s\n", parse);
       while (parse){
+      // printf("%s\n", parse);
+
         if(strcmp(parse, "DirectoryIndex") == 0)
         {
           parse = strtok(NULL, "");
-          directoryIndex = parse;
+          // strcpy(test, parse);
+          strcat(directoryIndex, strtok(deblank(parse),"\n"));
+
         }
         else if(strcmp(parse, "DocumentRoot") == 0)
         {
           parse = strtok(NULL, " ");
-          document_root = parse;
+          strcat(document_root, strtok(deblank(parse), "\n"));
         }
         else if(parse[0] == '.')
         {
@@ -73,7 +76,11 @@ void accept_request(int client)
         
       }
     }
+
   } 
+          // printf("directoryIndex is: %s\n", directoryIndex);
+
+
   fclose(file);
   ///////////////////
   ///////////////////
@@ -120,7 +127,7 @@ void accept_request(int client)
   {
     error400(client, "Invalid Method");
   }
-  if (strstr(url, ""))
+  // if (strstr(url, ""))
 
   // printf("%s", url);
   // parsing url to see file extension
@@ -130,11 +137,9 @@ void accept_request(int client)
     if(strstr(contentType, ext) == NULL)
     {
       error501(client, url);
-      close(client);
       return;
     }
   }
-  // printf("%s", path);
   sprintf(path, "www%s", url);
   if (path[strlen(path)] == '/')
   strcat(path, directoryIndex);
@@ -147,8 +152,8 @@ void accept_request(int client)
   else
   {
   if ((st.st_mode & S_IFMT) == S_IFDIR)
-   strcat(path,"/index.html");
-    // printf("%s is path\n", path);
+   strcat(path,"/");
+   strcat(path,directoryIndex);
    serve_file(client, path);
   }
 
@@ -257,6 +262,20 @@ void headers(int client, const char *filename)
     send(client, buf, strlen(buf), 0);
   }
 
+}
+
+char * deblank(char *str)
+{
+  char *out = str, *put = str;
+
+  for(; *str != '\0'; ++str)
+  {
+    if(*str != ' ')
+      *put++ = *str;
+  }
+  *put = '\0';
+
+  return out;
 }
 
 int get_line(int sock, char *buf, int size)
