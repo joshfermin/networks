@@ -1,5 +1,3 @@
-// code adapted from tinyhttpd-0.1.0 and rosetta code.
-// collaborated high level ideas with edward 
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -21,7 +19,7 @@ int get_line(int, char *, int);
 void serve_file(int, const char *);
 void headers(int client, const char *filename);
 void error404(int, const char *filename);
-void error400(int);
+void error400(int, char* type);
 void error500(int);
 void error501(int, const char *filename);
 
@@ -33,6 +31,7 @@ void accept_request(int client)
   FILE* file = fopen("ws.conf", "r");
   char line[256];
   char *directoryIndex;
+  char *document_root;
   char contentType[100];
   char *ext;
   char buf[1024];
@@ -54,8 +53,13 @@ void accept_request(int client)
       while (parse){
         if(strcmp(parse, "DirectoryIndex") == 0)
         {
-          parse = strtok(NULL, " ");
+          parse = strtok(NULL, "");
           directoryIndex = parse;
+        }
+        else if(strcmp(parse, "DocumentRoot") == 0)
+        {
+          parse = strtok(NULL, " ");
+          document_root = parse;
         }
         else if(parse[0] == '.')
         {
@@ -75,8 +79,6 @@ void accept_request(int client)
   ///////////////////
   ///////////////////
 
-
-
   numchars = get_line(client, buf, sizeof(buf));
   i = 0; j = 0;
 
@@ -87,6 +89,7 @@ void accept_request(int client)
     i++; j++;
   }
   method[i] = '\0';
+  // printf("%s", method);
 
   i = 0;
   while (ISspace(buf[j]) && (j < sizeof(buf)))
@@ -97,7 +100,7 @@ void accept_request(int client)
       i++; j++;
     }
   url[i] = '\0';
-
+  
   if (strcasecmp(method, "GET") == 0)
   {
     query_string = url;
@@ -109,7 +112,17 @@ void accept_request(int client)
      query_string++;
     }
   }
+  // printf("%s", query_string);
 
+
+  // 400 error handling
+  if (strcasecmp(method, "POST") == 0)
+  {
+    error400(client, "Invalid Method");
+  }
+  if (strstr(url, ""))
+
+  // printf("%s", url);
   // parsing url to see file extension
   ext = strrchr(url, '.');
   if (ext != NULL) {
@@ -117,14 +130,15 @@ void accept_request(int client)
     if(strstr(contentType, ext) == NULL)
     {
       error501(client, url);
+      close(client);
       return;
     }
   }
-  // printf("%s\n", path);
+  // printf("%s", path);
   sprintf(path, "www%s", url);
   if (path[strlen(path)] == '/')
   strcat(path, directoryIndex);
-// printf("%s\n", path);
+// printf("%s", path);
   if (stat(path, &st) == -1) {
   while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
    numchars = get_line(client, buf, sizeof(buf));
@@ -133,8 +147,8 @@ void accept_request(int client)
   else
   {
   if ((st.st_mode & S_IFMT) == S_IFDIR)
-   strcat(path, "/index.html");
- // printf("%s\n", path);
+   strcat(path,"/index.html");
+    // printf("%s is path\n", path);
    serve_file(client, path);
   }
 
@@ -170,7 +184,7 @@ void serve_file(int client, const char *filename)
       headers(client, filename);
       send(client, sendbuf, result, 0);   
     }   
-    else { printf("Send error."); exit(1); }
+    else { error500(client); }
   }
   
   fclose(requested_file);
@@ -250,6 +264,10 @@ int get_line(int sock, char *buf, int size)
   int i = 0;
   char c = '\0';
   int n;
+  char request[500];
+
+
+  // printf("%s\n", request);
 
   while ((i < size - 1) && (c != '\n'))
   {
@@ -297,7 +315,7 @@ void error404(int client, const char *filename)
 }
 
 // tell client that they have made a bad request.
-void error400(int client)
+void error400(int client, char *type)
 {
  char buf[1024];
 
@@ -307,8 +325,11 @@ void error400(int client)
  send(client, buf, sizeof(buf), 0);
  sprintf(buf, "\r\n");
  send(client, buf, sizeof(buf), 0);
- sprintf(buf, "<P>HTTP/1.1 400 Bad Request:  Invalid Method: ");
- send(client, buf, sizeof(buf), 0);
+ if(strcmp(type, "Invalid Method"))
+ {
+   sprintf(buf, "<P>HTTP/1.1 400 Bad Request:  Invalid Method");
+   send(client, buf, sizeof(buf), 0);
+ }
  sprintf(buf, "\r\n");
  send(client, buf, sizeof(buf), 0);
 }
@@ -351,9 +372,9 @@ void error501(int client, const char *filename)
 
 int main()
 {
-  ///////////////////
-  // PARSING LOGIC //
-  ///////////////////
+  ////////////////////////////
+  // PARSING LOGIC FOR PORT //
+  ////////////////////////////
   FILE* file = fopen("ws.conf", "r");
   char line[256];
   int port;

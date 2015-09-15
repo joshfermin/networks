@@ -1,8 +1,20 @@
 Simple web server
 Code inspired from: tinyhttpd-0.1.0 and rosetta code.
 
+To run: 
+	make clean
+	make
+	./webserver
+
 Web server currently handles: 
 	png, text, jpg, and html files
-	500, 501, 404 errors
+	500, 501, 404, and 400 errors
 
-Parsing logic works for content types  and port number.
+Parsing logic works for content types and port number.
+
+Compiled on a macintosh with gcc. 
+
+To test pipeline support, set the port to any number higher than 1024 and then run the
+following command replacing <your port number> with the one you chose:
+	(echo -en "GET /index.html HTTP/1.1\n Host: localhost \nConnection: keep-alive\n\nGET
+	/index.html HTTP/1.1\nHost: localhost\n\n"; sleep 10) | telnet localhost <your port number>
