@@ -263,7 +263,7 @@ void headers(int client, const char *filename)
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Type: text/plain\r\n");
     send(client, buf, strlen(buf), 0);
-    sprintf(buf, "Content-Length: %lld \r\n", size);
+    sprintf(buf, "Content-Length: %zd \r\n", size);
     send(client, buf, strlen(buf), 0);
     strcpy(buf, "\r\n");
     send(client, buf, strlen(buf), 0);
@@ -274,7 +274,7 @@ void headers(int client, const char *filename)
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Type: image/png\r\n");
     send(client, buf, strlen(buf), 0);
-    sprintf(buf, "Content-Length: %lld \r\n", size);
+    sprintf(buf, "Content-Length: %zd \r\n", size);
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Transfer-Encoding: binary\r\n");
     send(client, buf, strlen(buf), 0);
@@ -288,7 +288,7 @@ void headers(int client, const char *filename)
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Type: image/gif\r\n");
     send(client, buf, strlen(buf), 0);
-    sprintf(buf, "Content-Length: %lld \r\n", size);
+    sprintf(buf, "Content-Length: %zd \r\n", size);
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Transfer-Encoding: binary\r\n");
     send(client, buf, strlen(buf), 0);
