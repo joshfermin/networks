@@ -164,55 +164,55 @@ void accept_request(int client)
 // sends a file to the client
 void serve_file(int client, const char *filename)
 {
-  // char *sendbuf;
-  // FILE *requested_file;
-  // long fileLength;
-  // printf("Received request for file: %s on socket %d\n", filename + 1, client);
+  // printf("%s", filename);
+  char *sendbuf;
+  FILE *requested_file;
+  long fileLength;
+  printf("Received request for file: %s on socket %d\n", filename + 1, client);
   
-  // // if (fileSwitch) { requested_file = fopen(file + 1, "rb"); }
-  // requested_file = fopen(filename, "rb");
+  // if (fileSwitch) { requested_file = fopen(file + 1, "rb"); }
   
-  // if (requested_file == NULL)
-  // {
-  //   error404(client, filename);
-  // }
-  // else 
-  // {
-  //   fseek (requested_file, 0, SEEK_END);
-  //   fileLength = ftell(requested_file);
-  //   rewind(requested_file);
-    
-  //   sendbuf = (char*) malloc (sizeof(char)*fileLength);
-  //   size_t result = fread(sendbuf, 1, fileLength, requested_file);
-    
-  //   if (result > 0) 
-  //   {
-  //     headers(client, filename);
-  //     send(client, sendbuf, result, 0);   
-  //   }   
-  //   else { error500(client); }
-  // }
+  requested_file = fopen(filename, "rb");
   
-  // fclose(requested_file);
-  FILE *resource = NULL;
- int numchars = 1;
- char buf[1024];
+  if (requested_file == NULL)
+  {
+    error404(client, filename);
+  }
+  if(strstr(filename, ".html") != NULL)
+  {
+    FILE *resource = NULL;
+    int numchars = 1;
+    char buf[1024];
 
- buf[0] = 'A'; buf[1] = '\0';
- while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-  numchars = get_line(client, buf, sizeof(buf));
+    buf[0] = 'A'; buf[1] = '\0';
+    while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+      numchars = get_line(client, buf, sizeof(buf));
 
- resource = fopen(filename, "r");
- if (resource == NULL)
- {
-  error404(client, filename);
- }
- else
- {
-  headers(client, filename);
-  cat(client, resource);
- }
- fclose(resource);
+    resource = fopen(filename, "r");
+    headers(client, filename);
+    cat(client, resource);
+    fclose(resource);
+  }
+   else
+  {
+    // printf("im in else");
+    fseek (requested_file, 0, SEEK_END);
+    fileLength = ftell(requested_file);
+    rewind(requested_file);
+    
+    sendbuf = (char*) malloc (sizeof(char)*fileLength);
+    size_t result = fread(sendbuf, 1, fileLength, requested_file);
+    
+    if (result > 0) 
+    {
+      headers(client, filename);
+      send(client, sendbuf, result, 0);   
+    }   
+    else { error500(client); }
+  }
+  
+  fclose(requested_file);
+  
 }
 
 void cat(int client, FILE *resource)
