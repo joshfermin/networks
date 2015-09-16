@@ -138,7 +138,9 @@ void accept_request(int client)
     if(strstr(contentType, ext) == NULL)
     {
       error501(client, url);
-      return;
+      close(client);
+
+      // return;
     }
   }
   sprintf(path, "www%s", url);
