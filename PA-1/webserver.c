@@ -247,7 +247,7 @@ void headers(int client, const char *filename)
   } else {
     filetype = dot + 1;
   }
-
+  printf("%s", filetype);
   if(strcmp(filetype, "html") == 0)
   {
     strcpy(buf, "HTTP/1.1 200 OK\r\n");
@@ -260,9 +260,12 @@ void headers(int client, const char *filename)
 
   else if(strcmp(filetype, "txt") == 0)
   {
+    printf("hello");
     strcpy(buf, "HTTP/1.1 200 OK\r\n");
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Type: text/plain\r\n");
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Length: %lld \r\n", size);
     send(client, buf, strlen(buf), 0);
     strcpy(buf, "\r\n");
     send(client, buf, strlen(buf), 0);
