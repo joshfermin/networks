@@ -28,7 +28,7 @@ void accept_request(int client)
 {
   FILE* file = fopen("ws.conf", "r");
   char line[256];
-  char directoryIndex[100];
+  char directoryIndex[100]; 
   char document_root[100];
   char contentType[100];
   char *ext;
@@ -140,7 +140,7 @@ void accept_request(int client)
       return;
     }
   }
-  sprintf(path, "%s%s", document_root, url);
+  sprintf(path, "www%s", url);
   if (path[strlen(path)] == '/')
   strcat(path, directoryIndex);
 // printf("%s", path);
@@ -152,8 +152,8 @@ void accept_request(int client)
   else
   {
   if ((st.st_mode & S_IFMT) == S_IFDIR)
-   strcat(path,"/");
-   strcat(path,directoryIndex);
+   strcat(path,"/index.html");
+   // strcat(path,directoryIndex);
    serve_file(client, path);
   }
 
@@ -283,10 +283,6 @@ int get_line(int sock, char *buf, int size)
   int i = 0;
   char c = '\0';
   int n;
-  char request[500];
-
-
-  // printf("%s\n", request);
 
   while ((i < size - 1) && (c != '\n'))
   {
@@ -308,7 +304,7 @@ int get_line(int sock, char *buf, int size)
     }
     else
      c = '\n';
-    }
+  }
   buf[i] = '\0';
 
   return(i);
@@ -423,8 +419,8 @@ int main()
   ///////////////////
 
 
-  int one = 1, client_fd;
-  pthread_t newthread;
+  int one = 1, client_fd, status;
+  // pthread_t newthread;
 
   // sockaddr: structure to contain an internet address.
   struct sockaddr_in svr_addr, cli_addr;
@@ -460,11 +456,17 @@ int main()
                        (struct sockaddr *)&cli_addr,
                        &sin_len);
     // printf("got connection\n");
-    if (client_fd == -1)
-      perror("can't accept");
-    /* accept_request(client_sock); */
-    if (pthread_create(&newthread , NULL, accept_request, client_fd) != 0)
-      perror("pthread_create");
+      if(fork() == 0){
+        /* Perform the client’s request in the child process. */
+        accept_request(client_fd);
+        exit(0);
+      }
+      close(client_fd);
+
+      /* Collect dead children, but don’t wait for them. */
+      waitpid(−1, &status, WNOHANG);
+    // if (pthread_create(&newthread , NULL, accept_request, client_fd) != 0)
+      // perror("pthread_create");
   }
   close(sock);
 }
