@@ -17,6 +17,7 @@
 void accept_request(int);
 int get_line(int, char *, int);
 void serve_file(int, const char *);
+void cat(int, FILE *);
 void headers(int client, const char *filename);
 char * deblank(char *string);
 void error404(int, const char *filename);
@@ -163,38 +164,68 @@ void accept_request(int client)
 // sends a file to the client
 void serve_file(int client, const char *filename)
 {
-  char *sendbuf;
-  FILE *requested_file;
-  long fileLength;
-  printf("Received request for file: %s on socket %d\n", filename + 1, client);
+  // char *sendbuf;
+  // FILE *requested_file;
+  // long fileLength;
+  // printf("Received request for file: %s on socket %d\n", filename + 1, client);
   
-  // if (fileSwitch) { requested_file = fopen(file + 1, "rb"); }
-  requested_file = fopen(filename, "rb");
+  // // if (fileSwitch) { requested_file = fopen(file + 1, "rb"); }
+  // requested_file = fopen(filename, "rb");
   
-  if (requested_file == NULL)
-  {
-    error404(client, filename);
-  }
-  else 
-  {
-    fseek (requested_file, 0, SEEK_END);
-    fileLength = ftell(requested_file);
-    rewind(requested_file);
+  // if (requested_file == NULL)
+  // {
+  //   error404(client, filename);
+  // }
+  // else 
+  // {
+  //   fseek (requested_file, 0, SEEK_END);
+  //   fileLength = ftell(requested_file);
+  //   rewind(requested_file);
     
-    sendbuf = (char*) malloc (sizeof(char)*fileLength);
-    size_t result = fread(sendbuf, 1, fileLength, requested_file);
+  //   sendbuf = (char*) malloc (sizeof(char)*fileLength);
+  //   size_t result = fread(sendbuf, 1, fileLength, requested_file);
     
-    if (result > 0) 
-    {
-      headers(client, filename);
-      send(client, sendbuf, result, 0);   
-    }   
-    else { error500(client); }
-  }
+  //   if (result > 0) 
+  //   {
+  //     headers(client, filename);
+  //     send(client, sendbuf, result, 0);   
+  //   }   
+  //   else { error500(client); }
+  // }
   
-  fclose(requested_file);
+  // fclose(requested_file);
+  FILE *resource = NULL;
+ int numchars = 1;
+ char buf[1024];
+
+ buf[0] = 'A'; buf[1] = '\0';
+ while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+  numchars = get_line(client, buf, sizeof(buf));
+
+ resource = fopen(filename, "r");
+ if (resource == NULL)
+ {
+  error404(client, filename);
+ }
+ else
+ {
+  headers(client, filename);
+  cat(client, resource);
+ }
+ fclose(resource);
 }
 
+void cat(int client, FILE *resource)
+{
+ char buf[1024];
+
+ fgets(buf, sizeof(buf), resource);
+ while (!feof(resource))
+ {
+  send(client, buf, strlen(buf), 0);
+  fgets(buf, sizeof(buf), resource);
+ }
+}
 // provides the client with the correct headers
 // when a request is sent
 void headers(int client, const char *filename)
