@@ -464,7 +464,7 @@ int main()
       close(client_fd);
 
       /* Collect dead children, but don’t wait for them. */
-      waitpid(−1, &status, WNOHANG);
+      waitpid(-1, &status, WNOHANG);
     // if (pthread_create(&newthread , NULL, accept_request, client_fd) != 0)
       // perror("pthread_create");
   }
