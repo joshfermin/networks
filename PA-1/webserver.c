@@ -258,7 +258,7 @@ void headers(int client, const char *filename)
     send(client, buf, strlen(buf), 0);
   }
 
-  else if(strcmp(filetype, "text") == 0)
+  else if(strcmp(filetype, "txt") == 0)
   {
     strcpy(buf, "HTTP/1.1 200 OK\r\n");
     send(client, buf, strlen(buf), 0);
