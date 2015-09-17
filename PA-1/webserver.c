@@ -141,8 +141,7 @@ void accept_request(int client)
     if(strstr(contentType, ext) == NULL)
     {
       error501(client, url);
-      close(client);
-
+      // close(client);
       // return;
     }
   }
@@ -152,9 +151,9 @@ void accept_request(int client)
   strcat(path, "index.html");
 // printf("%s", path);
   if (stat(path, &st) == -1) {
-  while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-    numchars = get_line(client, buf, sizeof(buf));
-    error404(client, path);
+    while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+      numchars = get_line(client, buf, sizeof(buf));
+      error404(client, path);
   }
   else
   {
