@@ -145,25 +145,28 @@ void accept_request(int client)
       // return;
     }
   }
-  sprintf(path, "www%s", url);
-  // printf("%s ", path);
-  if (path[strlen(path)] == '/')
-  strcat(path, "index.html");
-// printf("%s", path);
-  if (stat(path, &st) == -1) {
-    while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-      numchars = get_line(client, buf, sizeof(buf));
-      error404(client, path);
-  }
   else
   {
-  if ((st.st_mode & S_IFMT) == S_IFDIR)
-   strcat(path, "/index.html");
-   // strcat(path,directoryIndex);
-   serve_file(client, path);
-  }
+    sprintf(path, "www%s", url);
+    // printf("%s ", path);
+    if (path[strlen(path)] == '/')
+    strcat(path, "index.html");
+  // printf("%s", path);
+    if (stat(path, &st) == -1) {
+      while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+        numchars = get_line(client, buf, sizeof(buf));
+        error404(client, path);
+    }
+    else
+    {
+    if ((st.st_mode & S_IFMT) == S_IFDIR)
+     strcat(path, "/index.html");
+     // strcat(path,directoryIndex);
+     serve_file(client, path);
+    }
 
-  close(client);
+    close(client);
+  }
 }
 
 // sends a file to the client
