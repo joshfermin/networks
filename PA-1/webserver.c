@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include "conf.h"
 
 #define ISspace(x) isspace((int)(x))
 
@@ -26,13 +27,10 @@ void error500(int);
 void error501(int, const char *filename);
 int isInvalidURI(char * uri);
 
+struct Conf;
+
 void accept_request(int client)
 {
-	FILE* file = fopen("ws.conf", "r");
-	char line[256];
-	char directoryIndex[100]; 
-	char document_root[100];
-	char contentType[100];
 	char *ext;
 	char buf[1024];
 	int numchars;
@@ -42,50 +40,6 @@ void accept_request(int client)
 	size_t i, j;
 	struct stat st;
 	char *query_string = NULL;
-
-
-	///////////////////
-	///PARSING LOGIC///
-	///////////////////
-	while (fgets(line, sizeof(line), file)) {
-				/* note that fgets don't strip the terminating \n, checking its
-					 presence would allow to handle lines longer that sizeof(line) */
-		if(line[0] != '#')
-		{
-			char* parse = strtok(line, " " );
-			while (parse){
-			// printf("%s\n", parse);
-
-				if(strcmp(parse, "DirectoryIndex") == 0)
-				{
-					parse = strtok(NULL, "");
-					strcat(directoryIndex, strtok(deblank(parse),"\n"));
-
-				}
-				else if(strcmp(parse, "DocumentRoot") == 0)
-				{
-					parse = strtok(NULL, " ");
-					strcat(document_root, strtok(deblank(parse), "\n"));
-				}
-				else if(parse[0] == '.')
-				{
-					strcat(contentType, parse);
-					parse = strtok(NULL, ",");
-				}
-				else
-				{
-					parse = strtok(NULL, " "); 
-				}
-				
-			}
-		}
-
-	}
-
-	fclose(file);
-	///////////////////
-	///////////////////
-	///////////////////
 
 	numchars = get_line(client, buf, sizeof(buf));
 	i = 0; j = 0;
@@ -138,35 +92,37 @@ void accept_request(int client)
 	ext = strrchr(url, '.');
 	if (ext != NULL) {
 		// printf("comparing contentType: %s with ext: %s", contentType, ext);
-		if(strstr(contentType, ext) == NULL)
+		if(strstr(conf.contentType, ext) == NULL)
 		{
 			error501(client, url);
 			// close(client);
 			// return;
 		}
 	}
+
+	// printf("contentType is: %s \n", conf.contentType);
+	// printf("document_root is: %s \n", conf.document_root);
+	// printf("directoryIndex is: %s \n", conf.DirectoryIndex);
+
+	sprintf(path, "%s%s", conf.document_root, url);
+	// printf("%s ", path);
+	if (path[strlen(path)] == '/')
+	strcat(path, "index.html");
+// printf("%s", path);
+	if (stat(path, &st) == -1) {
+		while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+			numchars = get_line(client, buf, sizeof(buf));
+			error404(client, path);
+	}
 	else
 	{
-		sprintf(path, "www%s", url);
-		// printf("%s ", path);
-		if (path[strlen(path)] == '/')
-		strcat(path, "index.html");
-	// printf("%s", path);
-		if (stat(path, &st) == -1) {
-			while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-				numchars = get_line(client, buf, sizeof(buf));
-				error404(client, path);
-		}
-		else
-		{
-		if ((st.st_mode & S_IFMT) == S_IFDIR)
-		 strcat(path, "/index.html");
-		 // strcat(path,directoryIndex);
-		 serve_file(client, path);
-		}
-
-		close(client);
+	if ((st.st_mode & S_IFMT) == S_IFDIR)
+	 strcat(path, "/index.html");
+	 // strcat(path,directoryIndex);
+	 serve_file(client, path);
 	}
+
+	close(client);
 }
 
 // sends a file to the client
@@ -433,42 +389,44 @@ void error501(int client, const char *filename)
 	send(client, buf, strlen(buf), 0);
 }
 
+// zhued parser copyright 2015. Thanks man!
+void parseConfFile(const char *filename)
+{
+	char *line;
+    char head[64], tail[256];
+    size_t len = 0;
+    int read_len = 0;
+
+    FILE* conf_file = fopen(filename, "r");
+    while((read_len = getline(&line, &len, conf_file)) != -1) {
+
+        line[read_len-1] = '\0';
+        if (line[0] == '#')
+            continue;
+        sscanf(line, "%s %s", head, tail);
+        if (!strcmp(head, "Listen")) {
+            conf.port = atoi(tail);
+        } 
+        if (!strcmp(head, "DocumentRoot")) {
+            sscanf(line, "%*s%s", conf.document_root);
+            conf.document_root[strlen(conf.document_root)-1] = '\0';
+        } 
+        if (!strcmp(head, "DirectoryIndex")) {
+            sscanf(line, "%*s %s", conf.DirectoryIndex);
+            conf.document_root[strlen(conf.DirectoryIndex)-1] = '\0';
+        }
+        if (head[0] == '.') {
+            strcat(conf.contentType, head);
+            strcat(conf.contentType, " ");
+        }
+    }
+    fclose(conf_file);
+}
 
 
 int main()
 {
-	////////////////////////////
-	// PARSING LOGIC FOR PORT //
-	////////////////////////////
-	FILE* file = fopen("ws.conf", "r");
-	char line[256];
-	int port;
-
-	while (fgets(line, sizeof(line), file)) {
-				/* note that fgets don't strip the terminating \n, checking its
-					 presence would allow to handle lines longer that sizeof(line) */
-		if(line[0] != '#')
-		{
-			char* parse = strtok(line, " " );
-			// printf("%s\n", parse);
-			while (parse){
-				if(strcmp(parse, "Listen") == 0){
-					parse = strtok(NULL, " ");
-					port = atoi(parse);
-				}
-				else
-				{
-					parse = strtok(NULL, " "); 
-				}
-			}
-		}
-	}
-	fclose(file);
-	///////////////////
-	// PARSING LOGIC //
-	///////////////////
-
-
+	parseConfFile("ws.conf");
 	int one = 1, client_fd, status;
 	// pthread_t newthread;
 
@@ -488,7 +446,7 @@ int main()
 
 	svr_addr.sin_family = AF_INET;
 	svr_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	svr_addr.sin_port = htons(port); // host to network short (htons)
+	svr_addr.sin_port = htons(conf.port); // host to network short (htons)
 
 	// Start server
 		if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
@@ -497,7 +455,7 @@ int main()
 		}
 	 
 		listen(sock, 5); // 5 is backlog - limits amount of connections in socket listen queue
-		printf("listening on localhost with port %d\n", port);
+		printf("listening on localhost with port %d\n", conf.port);
 
 
 	while (1)
