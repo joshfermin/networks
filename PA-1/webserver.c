@@ -24,6 +24,7 @@ void error404(int, const char *filename);
 void error400(int, char* type);
 void error500(int);
 void error501(int, const char *filename);
+int isInvalidURI(char * uri);
 
 void accept_request(int client)
 {
@@ -41,6 +42,8 @@ void accept_request(int client)
   size_t i, j;
   struct stat st;
   char *query_string = NULL;
+
+
   ///////////////////
   ///PARSING LOGIC///
   ///////////////////
@@ -56,7 +59,6 @@ void accept_request(int client)
         if(strcmp(parse, "DirectoryIndex") == 0)
         {
           parse = strtok(NULL, "");
-          // strcpy(test, parse);
           strcat(directoryIndex, strtok(deblank(parse),"\n"));
 
         }
@@ -78,9 +80,7 @@ void accept_request(int client)
       }
     }
 
-  } 
-          // printf("directoryIndex is: %s\n", directoryIndex);
-
+  }
 
   fclose(file);
   ///////////////////
@@ -90,14 +90,12 @@ void accept_request(int client)
   numchars = get_line(client, buf, sizeof(buf));
   i = 0; j = 0;
 
-  // 
   while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
   {
     method[i] = buf[j];
     i++; j++;
   }
   method[i] = '\0';
-  // printf("%s", method);
 
   i = 0;
   while (ISspace(buf[j]) && (j < sizeof(buf)))
@@ -108,6 +106,7 @@ void accept_request(int client)
       i++; j++;
     }
   url[i] = '\0';
+  // printf("url is: %s\n", url);
   
   if (strcasecmp(method, "GET") == 0)
   {
@@ -127,8 +126,12 @@ void accept_request(int client)
   if (strcasecmp(method, "POST") == 0)
   {
     error400(client, "Invalid Method");
+    // close(client);
   }
-  // if (strstr(url, ""))
+  if (isInvalidURI(url))
+  {
+    error400(client, "Invalid URI");
+  }
 
   // printf("%s", url);
   // parsing url to see file extension
@@ -144,18 +147,19 @@ void accept_request(int client)
     }
   }
   sprintf(path, "www%s", url);
+  // printf("%s ", path);
   if (path[strlen(path)] == '/')
-  strcat(path, directoryIndex);
+  strcat(path, "index.html");
 // printf("%s", path);
   if (stat(path, &st) == -1) {
   while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-   numchars = get_line(client, buf, sizeof(buf));
-  error404(client, path);
+    numchars = get_line(client, buf, sizeof(buf));
+    error404(client, path);
   }
   else
   {
   if ((st.st_mode & S_IFMT) == S_IFDIR)
-   strcat(path,"/index.html");
+   strcat(path, "/index.html");
    // strcat(path,directoryIndex);
    serve_file(client, path);
   }
@@ -217,6 +221,12 @@ void serve_file(int client, const char *filename)
   
 }
 
+int isInvalidURI(char * uri)
+{
+  // if(strstr())
+  return 0;
+}
+
 void cat(int client, FILE *resource)
 {
  char buf[1024];
@@ -250,6 +260,10 @@ void headers(int client, const char *filename)
   if(strcmp(filetype, "html") == 0)
   {
     strcpy(buf, "HTTP/1.1 200 OK\r\n");
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Content-Length: %zd \r\n", size);
+    send(client, buf, strlen(buf), 0);
+    sprintf(buf, "Connection: Keep-Alive \r\n");
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "Content-Type: text/html\r\n");
     send(client, buf, strlen(buf), 0);
