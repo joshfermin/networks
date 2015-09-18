@@ -44,12 +44,12 @@ void accept_request(int client)
 	numchars = get_line(client, buf, sizeof(buf));
 	i = 0; j = 0;
 
-	while ((!ISspace(buf[j]) && i < sizeof(method) - 1))
+	while ((!ISspace(buf[j]) && i < sizeof(http_request.method) - 1))
 	{
-		method[i] = buf[j];
+		http_request.method[i] = buf[j];
 		i++; j++;
 	}
-	method[i] = '\0';
+	http_request.method[i] = '\0';
 
 	// sscanf(method, "%s %s %s", http_request.method, http_request.path, http_request.http_version);
 	// http_request.method[strlen(http_request.method)-1] = '\0';
@@ -91,16 +91,7 @@ void accept_request(int client)
 	// printf("%s", query_string);
 
 
-	// 400 error handling
-	if (strcasecmp(http_request.method, "POST") == 0)
-	{
-		error400(client, "Invalid Method");
-		// close(client);
-	}
-	if (isInvalidURI(url))
-	{
-		error400(client, "Invalid URI");
-	}
+
 
 	// printf("%s", url);
 	// parsing url to see file extension
@@ -110,9 +101,23 @@ void accept_request(int client)
 		if(strstr(conf.contentType, ext) == NULL)
 		{
 			error501(client, url);
-			// close(client);
+			close(client);
 			// return;
 		}
+	}
+	// 400 error handling
+	else if (strcasecmp(http_request.method, "POST") == 0)
+	{
+		error400(client, "Invalid Method");
+		// close(client);
+	}
+	if (strcmp(http_request.http_version, "HTTP/1.1") != 0)
+	{
+		error400(client, "Invalid Version");
+	}
+	else if (isInvalidURI(url))
+	{
+		error400(client, "Invalid URI");
 	}
 
 	// printf("contentType is: %s \n", conf.contentType);

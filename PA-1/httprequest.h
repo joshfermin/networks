@@ -2,7 +2,7 @@
 #define HTTPREQUEST_H_
 struct Http_Request {
 	char 	method[100];
-	char 	path[256];
+	char 	url[256];
 	char 	http_version[16];
 	char 	host[128];
 	int 	keep_alive;
