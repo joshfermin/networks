@@ -12,6 +12,7 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 #include "conf.h"
+#include "httprequest.h"
 
 #define ISspace(x) isspace((int)(x))
 
@@ -27,7 +28,6 @@ void error500(int);
 void error501(int, const char *filename);
 int isInvalidURI(char * uri);
 
-struct Conf;
 
 void accept_request(int client)
 {
@@ -44,12 +44,15 @@ void accept_request(int client)
 	numchars = get_line(client, buf, sizeof(buf));
 	i = 0; j = 0;
 
-	while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
+	while ((!ISspace(buf[j]) && i < sizeof(method) - 1))
 	{
 		method[i] = buf[j];
 		i++; j++;
 	}
 	method[i] = '\0';
+
+	// sscanf(method, "%s %s %s", http_request.method, http_request.path, http_request.http_version);
+	// http_request.method[strlen(http_request.method)-1] = '\0';
 
 	i = 0;
 	while (ISspace(buf[j]) && (j < sizeof(buf)))
@@ -60,9 +63,21 @@ void accept_request(int client)
 			i++; j++;
 		}
 	url[i] = '\0';
+
+
+	i=0;
+	while (ISspace(buf[j]) && (j < sizeof(buf)))
+		j++;
+		while (!ISspace(buf[j]) && (i < sizeof(http_request.http_version) - 1) && (j < sizeof(buf)))
+		{
+			http_request.http_version[i] = buf[j];
+			i++; j++;
+		}
+	http_request.http_version[i] = '\0';
+	printf("%s\n", http_request.http_version);
 	// printf("url is: %s\n", url);
 	
-	if (strcasecmp(method, "GET") == 0)
+	if (strcasecmp(http_request.method, "GET") == 0)
 	{
 		query_string = url;
 		while ((*query_string != '?') && (*query_string != '\0'))
@@ -77,7 +92,7 @@ void accept_request(int client)
 
 
 	// 400 error handling
-	if (strcasecmp(method, "POST") == 0)
+	if (strcasecmp(http_request.method, "POST") == 0)
 	{
 		error400(client, "Invalid Method");
 		// close(client);
