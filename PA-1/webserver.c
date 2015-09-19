@@ -38,9 +38,19 @@ void accept_request(int client)
 	char path[512];
 	size_t i, j;
 	struct stat st;
+	char head[256], tail[256];	
 
 	numchars = get_line(client, buf, sizeof(buf));
 	sscanf(buf, "%s %s %s", http_request.method, http_request.url, http_request.http_version);
+
+	// while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+	// {
+	// 	// numchars = get_line(client, buf, sizeof(buf));
+ //        sscanf(buf, "%s %s", head, tail);
+ //        if (!strcmp("Connection:", head)){
+ //            printf("%s\n", tail);
+ //        }
+	// }
 
 	// printf("%s\n", buf);
 
@@ -143,8 +153,6 @@ void accept_request(int client)
 	// strcat(path, "index.html");
 	// printf("%s", path);
 
-	char head[256], tail[256];
-
 	if (stat(path, &st) == -1) {
 		while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
 		{
@@ -181,10 +189,10 @@ void serve_file(int client, const char *filename)
 	
 	requested_file = fopen(filename, "rb");
 	
-	if (requested_file == NULL)
-	{
-		error404(client, filename);
-	}
+	// if (requested_file == NULL)
+	// {
+	// 	error404(client, filename);
+	// }
 	if(strstr(filename, ".html") != NULL)
 	{
 		FILE *resource = NULL;
