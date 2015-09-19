@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+
 #include "conf.h"
 #include "httprequest.h"
 
@@ -34,79 +35,87 @@ void accept_request(int client)
 	char *ext;
 	char buf[1024];
 	int numchars;
-	char method[255];
-	char url[255];
 	char path[512];
 	size_t i, j;
 	struct stat st;
-	char *query_string = NULL;
 
 	numchars = get_line(client, buf, sizeof(buf));
-	i = 0; j = 0;
+	sscanf(buf, "%s %s %s", http_request.method, http_request.url, http_request.http_version);
 
-	while ((!ISspace(buf[j]) && i < sizeof(http_request.method) - 1))
-	{
-		http_request.method[i] = buf[j];
-		i++; j++;
-	}
-	http_request.method[i] = '\0';
+	// printf("%s\n", buf);
 
-	// sscanf(method, "%s %s %s", http_request.method, http_request.path, http_request.http_version);
-	// http_request.method[strlen(http_request.method)-1] = '\0';
+	http_request.method[strlen(http_request.method)+1] = '\0';
+    http_request.url[strlen(http_request.url)+1] = '\0';
+    http_request.http_version[strlen(http_request.http_version)+1] = '\0';
 
-	i = 0;
-	while (ISspace(buf[j]) && (j < sizeof(buf)))
-		j++;
-		while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
-		{
-			url[i] = buf[j];
-			i++; j++;
-		}
-	url[i] = '\0';
+    // printf("%s\n", http_request.method);
+    // printf("%s\n", http_request.url);
+    // printf("%s\n", http_request.http_version);
+
+	// i = 0; j = 0;
+
+	// while ((!ISspace(buf[j]) && i < sizeof(http_request.method) - 1))
+	// {
+	// 	http_request.method[i] = buf[j];
+	// 	i++; j++;
+	// }
+	// http_request.method[i] = '\0';
+
+	// // sscanf(method, "%s %s %s", http_request.method, http_request.path, http_request.http_version);
+	// // http_request.method[strlen(http_request.method)-1] = '\0';
+
+	// i = 0;
+	// while (ISspace(buf[j]) && (j < sizeof(buf)))
+	// 	j++;
+	// while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
+	// {
+	// 	url[i] = buf[j];
+	// 	i++; j++;
+	// }
+	// url[i] = '\0';
 
 
-	i=0;
-	while (ISspace(buf[j]) && (j < sizeof(buf)))
-		j++;
-		while (!ISspace(buf[j]) && (i < sizeof(http_request.http_version) - 1) && (j < sizeof(buf)))
-		{
-			http_request.http_version[i] = buf[j];
-			i++; j++;
-		}
-	http_request.http_version[i] = '\0';
-	printf("%s\n", http_request.http_version);
-	// printf("url is: %s\n", url);
-	
-	if (strcasecmp(http_request.method, "GET") == 0)
-	{
-		query_string = url;
-		while ((*query_string != '?') && (*query_string != '\0'))
-		 query_string++;
-		if (*query_string == '?')
-		{
-		 *query_string = '\0';
-		 query_string++;
-		}
-	}
+	// i=0;
+	// while (ISspace(buf[j]) && (j < sizeof(buf)))
+	// 	j++;
+	// while (!ISspace(buf[j]) && (i < sizeof(http_request.http_version) - 1) && (j < sizeof(buf)))
+	// {
+	// 	http_request.http_version[i] = buf[j];
+	// 	i++; j++;
+	// }
+	// http_request.http_version[i] = '\0';	
+
+	// if (strcasecmp(http_request.method, "GET") == 0)
+	// {
+	// 	query_string = url;
+	// 	while ((*query_string != '?') && (*query_string != '\0'))
+	// 	 query_string++;
+	// 	if (*query_string == '?')
+	// 	{
+	// 	 *query_string = '\0';
+	// 	 query_string++;
+	// 	}
+	// }
 	// printf("%s", query_string);
+
 
 
 
 
 	// printf("%s", url);
 	// parsing url to see file extension
-	ext = strrchr(url, '.');
+	ext = strrchr(http_request.url, '.');
 	if (ext != NULL) {
 		// printf("comparing contentType: %s with ext: %s", contentType, ext);
 		if(strstr(conf.contentType, ext) == NULL)
 		{
-			error501(client, url);
+			error501(client, http_request.url);
 			close(client);
 			// return;
 		}
 	}
 	// 400 error handling
-	else if (strcasecmp(http_request.method, "POST") == 0)
+	else if (strcmp(http_request.method, "GET"))
 	{
 		error400(client, "Invalid Method");
 		// close(client);
@@ -115,7 +124,7 @@ void accept_request(int client)
 	{
 		error400(client, "Invalid Version");
 	}
-	else if (isInvalidURI(url))
+	else if (isInvalidURI(http_request.url))
 	{
 		error400(client, "Invalid URI");
 	}
@@ -124,22 +133,36 @@ void accept_request(int client)
 	// printf("document_root is: %s \n", conf.document_root);
 	// printf("directoryIndex is: %s \n", conf.DirectoryIndex);
 
-	sprintf(path, "%s%s", conf.document_root, url);
+    sprintf(path, "%s%s", conf.document_root, http_request.url);
+    if (path[strlen(path) - 1] == '/')
+        strcat(path, conf.directory_index);
+
+
 	// printf("%s ", path);
-	if (path[strlen(path)] == '/')
-	strcat(path, "index.html");
-// printf("%s", path);
+	// if (path[strlen(path)] == '/')
+	// strcat(path, "index.html");
+	// printf("%s", path);
+
+	char head[256], tail[256];
+
 	if (stat(path, &st) == -1) {
 		while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+		{
 			numchars = get_line(client, buf, sizeof(buf));
-			error404(client, path);
+			printf("im in buf: %s \n", buf);
+            sscanf(buf, "%s %s", head, tail);
+            if (!strcmp("Connection:", head)){
+                printf("%s\n", tail);
+            }
+		}
+		error404(client, path);
 	}
 	else
 	{
 	if ((st.st_mode & S_IFMT) == S_IFDIR)
-	 strcat(path, "/index.html");
-	 // strcat(path,directoryIndex);
-	 serve_file(client, path);
+		strcat(path, "/index.html");
+		// strcat(path,directoryIndex);
+		serve_file(client, path);
 	}
 
 	close(client);
@@ -194,9 +217,7 @@ void serve_file(int client, const char *filename)
 		}   
 		else { error500(client); }
 	}
-	
 	fclose(requested_file);
-	
 }
 
 int isInvalidURI(char * uri)
@@ -331,6 +352,7 @@ int get_line(int sock, char *buf, int size)
 		else
 		 c = '\n';
 	}
+	// printf("%s", buf);
 	buf[i] = '\0';
 
 	return(i);
@@ -432,8 +454,8 @@ void parseConfFile(const char *filename)
             conf.document_root[strlen(conf.document_root)-1] = '\0';
         } 
         if (!strcmp(head, "DirectoryIndex")) {
-            sscanf(line, "%*s %s", conf.DirectoryIndex);
-            conf.document_root[strlen(conf.DirectoryIndex)-1] = '\0';
+            sscanf(line, "%*s %s", conf.directory_index);
+            conf.document_root[strlen(conf.directory_index)-1] = '\0';
         }
         if (head[0] == '.') {
             strcat(conf.contentType, head);
