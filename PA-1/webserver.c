@@ -36,7 +36,7 @@ void accept_request(int client)
 	char *ext;
 	char buf[1024];
 	int numchars;
-	int is_keepalive = NULL;
+	int is_keepalive;
 	char path[512];
 	struct stat st;
 	numchars = get_line(client, buf, sizeof(buf));
@@ -92,6 +92,7 @@ void accept_request(int client)
 		}
 		error404(client, path);
 	}
+
 	else
 	{
 	if ((st.st_mode & S_IFMT) == S_IFDIR)
@@ -135,10 +136,10 @@ void serve_file(int client, const char *filename)
 	
 	requested_file = fopen(filename, "rb");
 	
-	// if (requested_file == NULL)
-	// {
-	// 	error404(client, filename);
-	// }
+	if (requested_file == NULL)
+	{
+		error404(client, filename);
+	}
 	if(strstr(filename, ".html") != NULL)
 	{
 		FILE *resource = NULL;
