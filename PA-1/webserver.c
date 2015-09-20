@@ -28,6 +28,7 @@ void error400(int, char* type);
 void error500(int);
 void error501(int, const char *filename);
 int isInvalidURI(char * uri);
+int check_for_keepalive(int, char *buf, int);
 
 
 void accept_request(int client)
@@ -35,83 +36,20 @@ void accept_request(int client)
 	char *ext;
 	char buf[1024];
 	int numchars;
+	int is_keepalive;
 	char path[512];
-	size_t i, j;
 	struct stat st;
-	char head[256], tail[256];	
-
 	numchars = get_line(client, buf, sizeof(buf));
 	sscanf(buf, "%s %s %s", http_request.method, http_request.url, http_request.http_version);
 
-	// while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-	// {
-	// 	// numchars = get_line(client, buf, sizeof(buf));
- //        sscanf(buf, "%s %s", head, tail);
- //        if (!strcmp("Connection:", head)){
- //            printf("%s\n", tail);
- //        }
-	// }
-
-	// printf("%s\n", buf);
+	is_keepalive = check_for_keepalive(client, buf, numchars);
+	printf("%d\n", is_keepalive);
 
 	http_request.method[strlen(http_request.method)+1] = '\0';
     http_request.url[strlen(http_request.url)+1] = '\0';
     http_request.http_version[strlen(http_request.http_version)+1] = '\0';
 
-    // printf("%s\n", http_request.method);
-    // printf("%s\n", http_request.url);
-    // printf("%s\n", http_request.http_version);
-
-	// i = 0; j = 0;
-
-	// while ((!ISspace(buf[j]) && i < sizeof(http_request.method) - 1))
-	// {
-	// 	http_request.method[i] = buf[j];
-	// 	i++; j++;
-	// }
-	// http_request.method[i] = '\0';
-
-	// // sscanf(method, "%s %s %s", http_request.method, http_request.path, http_request.http_version);
-	// // http_request.method[strlen(http_request.method)-1] = '\0';
-
-	// i = 0;
-	// while (ISspace(buf[j]) && (j < sizeof(buf)))
-	// 	j++;
-	// while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
-	// {
-	// 	url[i] = buf[j];
-	// 	i++; j++;
-	// }
-	// url[i] = '\0';
-
-
-	// i=0;
-	// while (ISspace(buf[j]) && (j < sizeof(buf)))
-	// 	j++;
-	// while (!ISspace(buf[j]) && (i < sizeof(http_request.http_version) - 1) && (j < sizeof(buf)))
-	// {
-	// 	http_request.http_version[i] = buf[j];
-	// 	i++; j++;
-	// }
-	// http_request.http_version[i] = '\0';	
-
-	// if (strcasecmp(http_request.method, "GET") == 0)
-	// {
-	// 	query_string = url;
-	// 	while ((*query_string != '?') && (*query_string != '\0'))
-	// 	 query_string++;
-	// 	if (*query_string == '?')
-	// 	{
-	// 	 *query_string = '\0';
-	// 	 query_string++;
-	// 	}
-	// }
-	// printf("%s", query_string);
-
-
-
-
-
+    // printf("url is: %s\n", http_request.url);
 	// printf("%s", url);
 	// parsing url to see file extension
 	ext = strrchr(http_request.url, '.');
@@ -124,13 +62,13 @@ void accept_request(int client)
 			// return;
 		}
 	}
-	// 400 error handling
+	// 400 error handling - wrong method
 	else if (strcmp(http_request.method, "GET"))
 	{
 		error400(client, "Invalid Method");
 		// close(client);
 	}
-	if (strcmp(http_request.http_version, "HTTP/1.1") != 0)
+	else if (strcmp(http_request.http_version, "HTTP/1.1") != 0 || strcmp(http_request.http_version, "HTTP/1.0"))
 	{
 		error400(client, "Invalid Version");
 	}
@@ -148,20 +86,10 @@ void accept_request(int client)
         strcat(path, conf.directory_index);
 
 
-	// printf("%s ", path);
-	// if (path[strlen(path)] == '/')
-	// strcat(path, "index.html");
-	// printf("%s", path);
-
 	if (stat(path, &st) == -1) {
 		while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
 		{
 			numchars = get_line(client, buf, sizeof(buf));
-			printf("im in buf: %s \n", buf);
-            sscanf(buf, "%s %s", head, tail);
-            if (!strcmp("Connection:", head)){
-                printf("%s\n", tail);
-            }
 		}
 		error404(client, path);
 	}
@@ -174,6 +102,25 @@ void accept_request(int client)
 	}
 
 	close(client);
+}
+
+int check_for_keepalive(int client, char *buf, int numchars)
+{
+	char header[1024];
+	// printf("%d", numchars);
+	while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
+	{
+
+		numchars = get_line(client, buf, sizeof(numchars));
+		strcat(header, buf);
+		// printf("%s\n", buf);
+		// sscanf(buf, "%s %s", head, tail);
+	}
+	if (!strstr("Connection: keep-alive", header)){
+		return 1;
+	}
+	return 0;
+	// printf("%s\n", header);
 }
 
 // sends a file to the client
@@ -230,7 +177,14 @@ void serve_file(int client, const char *filename)
 
 int isInvalidURI(char * uri)
 {
-	// if(strstr())
+	if(strstr(uri, " "))
+	{
+		return 1;
+	}
+	if(strstr(uri,"\\"))
+	{
+		return 1;
+	}
 	return 0;
 }
 
