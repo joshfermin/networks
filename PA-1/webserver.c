@@ -36,7 +36,7 @@ void accept_request(int client)
 	char *ext;
 	char buf[1024];
 	int numchars;
-	int is_keepalive;
+	int is_keepalive = NULL;
 	char path[512];
 	struct stat st;
 	numchars = get_line(client, buf, sizeof(buf));
@@ -429,9 +429,9 @@ void parseConfFile(const char *filename)
 
 int main()
 {
-	struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
+	// struct timeval timeout;      
+ //    timeout.tv_sec = 10;
+ //    timeout.tv_usec = 0;
 
 	parseConfFile("ws.conf");
 	int one = 1, client_fd, status;
