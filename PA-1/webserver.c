@@ -36,13 +36,14 @@ void accept_request(int client)
 	char *ext;
 	char buf[1024];
 	int numchars;
-	int is_keepalive;
 	char path[512];
 	struct stat st;
+	// int is_keepalive;
+	
 	numchars = get_line(client, buf, sizeof(buf));
 	sscanf(buf, "%s %s %s", http_request.method, http_request.url, http_request.http_version);
 
-	is_keepalive = check_for_keepalive(client, buf, numchars);
+	// is_keepalive = check_for_keepalive(client, buf, numchars);
 
 	http_request.method[strlen(http_request.method)+1] = '\0';
     http_request.url[strlen(http_request.url)+1] = '\0';
@@ -92,13 +93,12 @@ void accept_request(int client)
 		}
 		error404(client, path);
 	}
-
 	else
 	{
-	if ((st.st_mode & S_IFMT) == S_IFDIR)
-		strcat(path, "/index.html");
-		// strcat(path,directoryIndex);
-		serve_file(client, path);
+		if ((st.st_mode & S_IFMT) == S_IFDIR)
+			strcat(path, "/index.html");
+			// strcat(path,directoryIndex);
+			serve_file(client, path);
 	}
 
 	close(client);
