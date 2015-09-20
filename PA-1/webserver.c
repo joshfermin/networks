@@ -43,7 +43,6 @@ void accept_request(int client)
 	sscanf(buf, "%s %s %s", http_request.method, http_request.url, http_request.http_version);
 
 	is_keepalive = check_for_keepalive(client, buf, numchars);
-	printf("%d\n", is_keepalive);
 
 	http_request.method[strlen(http_request.method)+1] = '\0';
     http_request.url[strlen(http_request.url)+1] = '\0';
@@ -430,6 +429,10 @@ void parseConfFile(const char *filename)
 
 int main()
 {
+	struct timeval timeout;      
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
+
 	parseConfFile("ws.conf");
 	int one = 1, client_fd, status;
 	// pthread_t newthread;
@@ -447,6 +450,7 @@ int main()
 	// (int socket SOL_SOCKET to set options at socket level, allows reuse of local addresses,
 	// option value, size of socket)
 	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
+	// setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
 
 	svr_addr.sin_family = AF_INET;
 	svr_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -464,9 +468,7 @@ int main()
 
 	while (1)
 	{
-		client_fd = accept(sock,
-											 (struct sockaddr *)&cli_addr,
-											 &sin_len);
+		client_fd = accept(sock, (struct sockaddr *)&cli_addr, &sin_len);
 		// printf("got connection\n");
 			if(fork() == 0){
 				/* Perform the client’s request in the child process. */
