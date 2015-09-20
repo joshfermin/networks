@@ -39,7 +39,7 @@ void accept_request(int client)
 	char path[512];
 	struct stat st;
 	// int is_keepalive;
-	
+
 	numchars = get_line(client, buf, sizeof(buf));
 	sscanf(buf, "%s %s %s", http_request.method, http_request.url, http_request.http_version);
 
@@ -68,7 +68,7 @@ void accept_request(int client)
 		error400(client, "Invalid Method");
 		// close(client);
 	}
-	else if (strcmp(http_request.http_version, "HTTP/1.1") != 0 || strcmp(http_request.http_version, "HTTP/1.0"))
+	else if (strcmp(http_request.http_version, "HTTP/1.1") != 0 || strcmp(http_request.http_version, "HTTP/1.0") != 0)
 	{
 		error400(client, "Invalid Version");
 	}
