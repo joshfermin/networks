@@ -15,6 +15,7 @@
 #include "configdfc.h"
 
 void parseConfFile(const char *);
+void read_user_input();
 
 void parseConfFile(const char *filename)
 {
@@ -50,15 +51,55 @@ void parseConfFile(const char *filename)
         } 
         if (!strcmp(head, "Username:")) {
             sscanf(tail, "%s", confdfc.username);
-            confdfc.username[strlen(confdfc.username)-1] = '\0';
+            // confdfc.username[strlen(confdfc.username)-1] = '\0';
         } 
         if (!strcmp(head, "Password:")) {
             sscanf(tail, "%s", confdfc.password);
-            confdfc.password[strlen(confdfc.password)-1] = '\0';
+            // confdfc.password[strlen(confdfc.password)-1] = '\0';
         }
     }
     fclose(conf_file);
 }
+
+void read_user_input() {
+    char *line = NULL;      /* Line read from STDIN */
+    char *token;
+    ssize_t len;
+    char command[8], arg[64];
+    int status = 1;
+
+    // printf("Servers: %d\n", config.server_count);
+
+    while (status) {
+        printf("%s> ", confdfc.username);
+        getline(&line, &len, stdin);
+
+        sscanf(line, "%s %s", command, arg);
+        if (!strncasecmp(command, "LIST", 4)) {
+            // send_request(0, line);
+            printf("the command you entered was: %s\n", command);
+
+        }
+        if (!strncasecmp(command, "GET", 3)) {
+
+        }
+        if (!strncasecmp(command, "PUT", 3)) {
+
+        }
+        if (!strncasecmp(command, "QUIT", 4)) {
+            status = 0;
+        }
+        if (!strncasecmp(command, "HELP", 4)) {
+            printf("You can enter the following commands: LIST, GET, PUT, and QUIT\n");
+        }
+        else{
+            printf("Invalid command. Type \"HELP\" for more options.\n");
+        }
+        //printf("%s\n", command);
+    }
+    printf("Shutting down...\n");
+}
+
 
 int main(int argc, char *argv[], char **envp)
 {
@@ -68,10 +109,5 @@ int main(int argc, char *argv[], char **envp)
     {
         parseConfFile(argv[1]);
     }
-    while(scanf("%c", &a) == 1)
-    {
-        printf("Enter command: ");                                                                                                                                                                
-        scanf("%s", buf); 
-        printf("the comand you entered is: %s", buf)
-    } 
+    read_user_input();
 }
