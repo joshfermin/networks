@@ -12,7 +12,6 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 
-
 void parseConfFile(const char *);
 
 void parseConfFile(const char *filename)
