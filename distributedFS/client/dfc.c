@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <sys/errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <ctype.h>
@@ -16,7 +18,10 @@
 
 void parseConfFile(const char *);
 void read_user_input();
-int connect(const char *port, const char *hostname);
+int connect_socket(const char *port, const char *hostname);
+void list();
+int put(char *filename);
+int get(char *filename);
 
 
 // Parses a file you give it
@@ -67,20 +72,19 @@ void parseConfFile(const char *filename)
 // Reads user input to get LIST, PUT, GET, QUIT, HELP commands
 void read_user_input() {
     char *line = NULL;      /* Line read from STDIN */
-    char *token;
-    ssize_t len;
+    size_t len;
+    ssize_t read;
     char command[8], arg[64];
     int status = 1;
 
-    // printf("Servers: %d\n", config.server_count);
 
     while (status) {
         printf("%s> ", confdfc.username);
-        getline(&line, &len, stdin);
+        read = getline(&line, &len, stdin);
+        line[read-1] = '\0';
 
         sscanf(line, "%s %s", command, arg);
         if (!strncasecmp(command, "LIST", 4)) {
-            // send_request(0, line);
             printf("the command you entered was: %s\n", command);
 
         }
@@ -99,13 +103,29 @@ void read_user_input() {
         else{
             printf("Invalid command. Type \"HELP\" for more options.\n");
         }
-        //printf("%s\n", command);
     }
     printf("Shutting down...\n");
 }
 
+void list()
+{
+
+}
+
+int put(char *filename)
+{
+
+    return 0;
+}
+
+int get(char *filename)
+{
+
+    return 0;
+}
+
 // Connect to a certain socket
-int connect(const char *port, const char *hostname)
+int connect_socket(const char *port, const char *hostname)
 {
     struct hostent  *phe;     
     struct sockaddr_in sockin;
@@ -118,18 +138,18 @@ int connect(const char *port, const char *hostname)
     /* Convert and set port */
     sockin.sin_port = htons((unsigned short)atoi(port));
     if (sockin.sin_port == 0)
-        perror("Unable to get port number: \"%s\"\n", port);
+        fprintf(stderr, "Error getting port: %s\n", port);
 
     /* Map host name to IP address, allowing for dotted decimal */
-    if ( phe = gethostbyname(hostname) )
+    if ((phe = gethostbyname(hostname)))
         memcpy(&sockin.sin_addr, phe->h_addr, phe->h_length);
     else if ( (sockin.sin_addr.s_addr = inet_addr(hostname)) == INADDR_NONE )
-        perror("Can't get \"%s\" host entry\n", hostname);
+        fprintf(stderr, "Cant get host %s\n", hostname);
 
     /* Allocate a socket */
     sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock < 0)
-        perror("Unable to create socket: %s\n", strerror(errno));
+        fprintf(stderr, "Cant create socket %s\n", strerror(errno));
 
     /* Connect the socket */
     if (connect(sock, (struct sockaddr *)&sockin, sizeof(sockin)) < 0)
@@ -140,14 +160,15 @@ int connect(const char *port, const char *hostname)
 }
 
 // 
-
 int main(int argc, char *argv[], char **envp)
 {
-    char buf[256];
-    char a;
     if(argv[1])
     {
         parseConfFile(argv[1]);
+        read_user_input();
     }
-    read_user_input();
+    else
+    {
+        printf("Please specify a config file.\n");
+    }
 }
