@@ -16,7 +16,10 @@
 
 void parseConfFile(const char *);
 void read_user_input();
+int connect(const char *port, const char *hostname);
 
+
+// Parses a file you give it
 void parseConfFile(const char *filename)
 {
 	char *line;
@@ -61,6 +64,7 @@ void parseConfFile(const char *filename)
     fclose(conf_file);
 }
 
+// Reads user input to get LIST, PUT, GET, QUIT, HELP commands
 void read_user_input() {
     char *line = NULL;      /* Line read from STDIN */
     char *token;
@@ -80,17 +84,17 @@ void read_user_input() {
             printf("the command you entered was: %s\n", command);
 
         }
-        if (!strncasecmp(command, "GET", 3)) {
+        else if (!strncasecmp(command, "GET", 3)) {
 
         }
-        if (!strncasecmp(command, "PUT", 3)) {
+        else if (!strncasecmp(command, "PUT", 3)) {
 
         }
-        if (!strncasecmp(command, "QUIT", 4)) {
+        else if (!strncasecmp(command, "QUIT", 4) || !strncasecmp(command, "EXIT", 4)) {
             status = 0;
         }
-        if (!strncasecmp(command, "HELP", 4)) {
-            printf("You can enter the following commands: LIST, GET, PUT, and QUIT\n");
+        else if (!strncasecmp(command, "HELP", 4)) {
+            printf("You can enter the following commands: LIST, GET, PUT, EXIT and QUIT\n");
         }
         else{
             printf("Invalid command. Type \"HELP\" for more options.\n");
@@ -100,6 +104,42 @@ void read_user_input() {
     printf("Shutting down...\n");
 }
 
+// Connect to a certain socket
+int connect(const char *port, const char *hostname)
+{
+    struct hostent  *phe;     
+    struct sockaddr_in sockin;
+    int sock;                 
+
+    memset(&sockin, 0, sizeof(sockin));
+
+    sockin.sin_family = AF_INET;
+
+    /* Convert and set port */
+    sockin.sin_port = htons((unsigned short)atoi(port));
+    if (sockin.sin_port == 0)
+        perror("Unable to get port number: \"%s\"\n", port);
+
+    /* Map host name to IP address, allowing for dotted decimal */
+    if ( phe = gethostbyname(hostname) )
+        memcpy(&sockin.sin_addr, phe->h_addr, phe->h_length);
+    else if ( (sockin.sin_addr.s_addr = inet_addr(hostname)) == INADDR_NONE )
+        perror("Can't get \"%s\" host entry\n", hostname);
+
+    /* Allocate a socket */
+    sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock < 0)
+        perror("Unable to create socket: %s\n", strerror(errno));
+
+    /* Connect the socket */
+    if (connect(sock, (struct sockaddr *)&sockin, sizeof(sockin)) < 0)
+        return -1; /* Connection failed */
+
+    printf("Socket %d connected on port %d\n", sock, ntohs(sockin.sin_port));
+    return sock;
+}
+
+// 
 
 int main(int argc, char *argv[], char **envp)
 {
