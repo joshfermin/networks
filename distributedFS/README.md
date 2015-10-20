@@ -1,5 +1,5 @@
 # Distributed File System
-Created and compiled using gcc
+Compiled using gcc
 
 ### Usage
 To run:
