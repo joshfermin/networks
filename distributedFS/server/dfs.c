@@ -158,35 +158,57 @@ void processRequest(int connection)
 
 int listenOnPort(int port) 
 {
-    int sock, optval=1;
-    struct sockaddr_in serveraddr;
+	int one = 1, client_fd, status;
 
-    // Create a socket descriptor 
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-        return -1;
+	// sockaddr: structure to contain an internet address.
+	struct sockaddr_in svr_addr, cli_addr;
+	socklen_t sin_len = sizeof(cli_addr);
 
-    // Eliminates "Address already in use" error from bind. 
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, 
-                (const void *)&optval , sizeof(int)) < 0)
-        return -1;
+	// create endpoint for comm, AF_INET (IPv4 Internet Protocol), 
+	// SOCK_STREAM (Provides sequenced, reliable, two-way, connection-based byte streams),
+	int sock = socket(AF_INET, SOCK_STREAM, 0); // returns file descriptor for new socket
+	// if (sock < 0)
+	//   err(1, "cant open socket");
+
+	// (int socket SOL_SOCKET to set options at socket level, allows reuse of local addresses,
+	// option value, size of socket)
+	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
+	// setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
+
+	svr_addr.sin_family = AF_INET;
+	svr_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	svr_addr.sin_port = htons(port); // host to network short (htons)
+
+	// Start server
+	if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
+		close(sock);
+	}
+ 
+	listen(sock, 200); // 5 is backlog - limits amount of connections in socket listen queue
+	printf("listening on localhost with port %d\n", port);
 
 
-    bzero((char *) &serveraddr, sizeof(serveraddr));
-    serveraddr.sin_family = AF_INET; 
-    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY); 
-    serveraddr.sin_port = htons((unsigned short)port); 
-    if (bind(sock, (struct sockaddr*)&serveraddr, sizeof(serveraddr)) < 0)
-        return -1;
+	while (1)
+	{
+		client_fd = accept(sock, (struct sockaddr *)&cli_addr, &sin_len);
+		// printf("got connection\n");
+			if(fork() == 0){
+				/* Perform the client’s request in the child process. */
+				processRequest(client_fd);
+				exit(0);
+			}
+			close(client_fd);
 
-    // Make it a listening socket ready to accept connection requests 
-    if (listen(sock, 1024) < 0)
-        return -1;
-    return sock;
+			/* Collect dead children, but don’t wait for them. */
+			waitpid(-1, &status, WNOHANG);
+		// if (pthread_hread_create");
+	}
+	close(sock);
 }
 
 int main(int argc, char *argv[], char **envp)
 {
-	int connection;
+	int client_fd, status;
 	if(argc != 3)
 	{
 		printf("Please check your arguments.");
@@ -210,9 +232,16 @@ int main(int argc, char *argv[], char **envp)
 
     // 
     while (1) {
-        connection = accept(sock, (struct sockaddr*)&client_addr, &client_len);
-        printf("Connected! %d\n", server_port );         
-        processRequest(connection);
+        client_fd = accept(sock, (struct sockaddr*)&client_addr, &client_len);
+        if(fork() == 0){
+	        printf("Connected! %d\n", server_port);         
+	        processRequest(client_fd);    
+	        exit(0);    	
+        }
+        close(client_fd);
+
+        /* Collect dead children, but don’t wait for them. */
+		waitpid(-1, &status, WNOHANG);
     }
 
     return 1;

@@ -16,9 +16,9 @@
 
 #include "configdfc.h"
 
-void parseConfFile(const char *);
+int parseConfFile(const char *);
 void readUserInput();
-int connectSocket(const char *port, const char *hostname);
+int connectSocket(int port, const char *hostname);
 void list();
 int put(char *filename);
 int get(char *filename);
@@ -27,9 +27,8 @@ char username[128];
 char password[128];
 server * servers; 
 
-
 // Parses a file you give it
-void parseConfFile(const char *filename)
+int parseConfFile(const char *filename)
 {
 	char *line;
     char * token;
@@ -39,12 +38,10 @@ void parseConfFile(const char *filename)
     int i=0;
     FILE* conf_file = fopen(filename, "r");
     if (conf_file == NULL)
-        exit(EXIT_FAILURE);
-
-    servers = malloc(4 * sizeof(servers));
+        fprintf(stderr, "Could not open config file.\n");
+    servers = malloc(4 * sizeof(server));
 
     while((read_len = getline(&line, &len, conf_file)) != -1) {
-        // printf("%s",line);
         line[read_len-1] = '\0';
         if (line[0] == '#')
             continue;
@@ -52,12 +49,10 @@ void parseConfFile(const char *filename)
         sscanf(line, "%s %s %s", head, tail, tail2);
         if (!strcmp(head, "Server")) {
             token = strtok(tail2, ":");
-            // printf("Host: %s\n", token);
-            strcpy(servers[i].host,token);
-
+            strncpy(servers[i].host,token, 20);
             token = strtok(NULL, " ");
-            // printf("Port: %s\n", token);
             servers[i].port= atoi(token);
+            i++;
         } 
         if (!strcmp(head, "Username:")) {
             sscanf(tail, "%s", username);
@@ -67,11 +62,14 @@ void parseConfFile(const char *filename)
             sscanf(tail, "%s", password);
             // confdfc.password[strlen(confdfc.password)-1] = '\0';
         }
-        i++;
     }
+
+    // printf("%d\n", i);
     // printf("%s\n", username);
     // printf("%s\n", servers[0].host);
     fclose(conf_file);
+
+    return i;
 }
 
 // Reads user input to get LIST, PUT, GET, QUIT, HELP commands
@@ -130,38 +128,32 @@ int get(char *filename)
 }
 
 // Connect to a certain socket
-int connectSocket(const char *port, const char *hostname)
+int connectSocket(int port, const char *hostname)
 {
-    struct hostent  *phe;     
-    struct sockaddr_in sockin;
-    int sock;                 
-
-    memset(&sockin, 0, sizeof(sockin));
-
-    sockin.sin_family = AF_INET;
-
-    /* Convert and set port */
-    sockin.sin_port = htons((unsigned short)atoi(port));
-    if (sockin.sin_port == 0)
-        fprintf(stderr, "Error getting port: %s\n", port);
-
-    /* Map host name to IP address, allowing for dotted decimal */
-    if ((phe = gethostbyname(hostname)))
-        memcpy(&sockin.sin_addr, phe->h_addr, phe->h_length);
-    else if ( (sockin.sin_addr.s_addr = inet_addr(hostname)) == INADDR_NONE )
-        fprintf(stderr, "Cant get host %s\n", hostname);
-
-    // Create a socket
-    sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sock < 0)
-        fprintf(stderr, "Cant create socket %s\n", strerror(errno));
-
-    /* Connect the socket */
-    if (connect(sock, (struct sockaddr *)&sockin, sizeof(sockin)) < 0)
-        return -1; /* Connection failed */
-
-    printf("Socket %d connected on port %d\n", sock, ntohs(sockin.sin_port));
-    return sock;
+    int sock;
+    struct sockaddr_in server;
+    char message[1000] , server_reply[2000];
+     
+    //Create socket
+    sock = socket(AF_INET , SOCK_STREAM , 0);
+    if (sock == -1)
+    {
+        printf("Could not create socket");
+    }
+    puts("Socket created");
+     
+    server.sin_addr.s_addr = inet_addr(hostname);
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+ 
+    //Connect to remote server
+    if (connect(sock , (struct sockaddr *)&server , sizeof(server)) < 0)
+    {
+        perror("connect failed. Error");
+        return 1;
+    }
+    printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
+    return 0;
 }
 
 
@@ -169,7 +161,19 @@ int main(int argc, char *argv[], char **envp)
 {
     if(argv[1])
     {
-        parseConfFile(argv[1]);
+        int num_servers;
+
+        num_servers = parseConfFile(argv[1]);
+        // printf("%s\n",servers[1].host );
+        // printf("%d\n",servers[1].port );
+        printf("There are %d servers in the config file.\n", num_servers);
+        printf("Attempting to connect...\n");
+        for (int i = 0; i < num_servers; ++i)
+        {
+            // printf("%d\n", servers[i].port);
+            // printf("%s\n", servers[i].host);
+            connectSocket(servers[i].port, servers[i].host);
+        }
         readUserInput();
     }
     else
