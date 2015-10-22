@@ -17,60 +17,65 @@
 #include "configdfc.h"
 
 void parseConfFile(const char *);
-void read_user_input();
-int connect_socket(const char *port, const char *hostname);
+void readUserInput();
+int connectSocket(const char *port, const char *hostname);
 void list();
 int put(char *filename);
 int get(char *filename);
+
+char username[128];
+char password[128];
+server * servers; 
 
 
 // Parses a file you give it
 void parseConfFile(const char *filename)
 {
 	char *line;
+    char * token;
     char head[64], tail[256], tail2[256];
     size_t len = 0;
     int read_len = 0;
-
+    int i=0;
     FILE* conf_file = fopen(filename, "r");
+    if (conf_file == NULL)
+        exit(EXIT_FAILURE);
+
+    servers = malloc(4 * sizeof(servers));
+
     while((read_len = getline(&line, &len, conf_file)) != -1) {
         // printf("%s",line);
         line[read_len-1] = '\0';
         if (line[0] == '#')
             continue;
+
         sscanf(line, "%s %s %s", head, tail, tail2);
         if (!strcmp(head, "Server")) {
-            if(!strcmp(tail, "DFS1"))
-            {
-                sscanf(tail2, "%s", confdfc.DFS1);
-            }
-            if(!strcmp(tail, "DFS2"))
-            {
-                sscanf(tail2, "%s", confdfc.DFS2);
-            }
-            if(!strcmp(tail, "DFS3"))
-            {
-                sscanf(tail2, "%s", confdfc.DFS3);
-            }
-            if(!strcmp(tail, "DFS4"))
-            {
-                sscanf(tail2, "%s", confdfc.DFS4);
-            }
+            token = strtok(tail2, ":");
+            // printf("Host: %s\n", token);
+            strcpy(servers[i].host,token);
+
+            token = strtok(NULL, " ");
+            // printf("Port: %s\n", token);
+            servers[i].port= atoi(token);
         } 
         if (!strcmp(head, "Username:")) {
-            sscanf(tail, "%s", confdfc.username);
+            sscanf(tail, "%s", username);
             // confdfc.username[strlen(confdfc.username)-1] = '\0';
         } 
         if (!strcmp(head, "Password:")) {
-            sscanf(tail, "%s", confdfc.password);
+            sscanf(tail, "%s", password);
             // confdfc.password[strlen(confdfc.password)-1] = '\0';
         }
+        i++;
     }
+    // printf("%s\n", username);
+    // printf("%s\n", servers[0].host);
     fclose(conf_file);
 }
 
 // Reads user input to get LIST, PUT, GET, QUIT, HELP commands
-void read_user_input() {
+void readUserInput() {
     char *line = NULL;      /* Line read from STDIN */
     size_t len;
     ssize_t read;
@@ -79,7 +84,7 @@ void read_user_input() {
 
 
     while (status) {
-        printf("%s> ", confdfc.username);
+        printf("%s> ", username);
         read = getline(&line, &len, stdin);
         line[read-1] = '\0';
 
@@ -125,7 +130,7 @@ int get(char *filename)
 }
 
 // Connect to a certain socket
-int connect_socket(const char *port, const char *hostname)
+int connectSocket(const char *port, const char *hostname)
 {
     struct hostent  *phe;     
     struct sockaddr_in sockin;
@@ -146,7 +151,7 @@ int connect_socket(const char *port, const char *hostname)
     else if ( (sockin.sin_addr.s_addr = inet_addr(hostname)) == INADDR_NONE )
         fprintf(stderr, "Cant get host %s\n", hostname);
 
-    /* Allocate a socket */
+    // Create a socket
     sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock < 0)
         fprintf(stderr, "Cant create socket %s\n", strerror(errno));
@@ -159,13 +164,13 @@ int connect_socket(const char *port, const char *hostname)
     return sock;
 }
 
-// 
+
 int main(int argc, char *argv[], char **envp)
 {
     if(argv[1])
     {
         parseConfFile(argv[1]);
-        read_user_input();
+        readUserInput();
     }
     else
     {
