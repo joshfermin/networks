@@ -1,3 +1,9 @@
+// Distributed File System
+// By: Josh Fermin
+// 
+// Followed:
+// http://www.binarytides.com/server-client-example-c-sockets-linux/
+
 #include <stdio.h>
 #include <sys/errno.h>
 #include <sys/socket.h>
@@ -17,8 +23,8 @@
 #include "configdfc.h"
 
 int parseConfFile(const char *);
-void readUserInput();
-int connectSocket(int port, const char *hostname);
+void readUserInput(int);
+int connectSocket(int, const char *);
 void list();
 int put(char *filename);
 int get(char *filename);
@@ -73,7 +79,7 @@ int parseConfFile(const char *filename)
 }
 
 // Reads user input to get LIST, PUT, GET, QUIT, HELP commands
-void readUserInput() {
+void readUserInput(int sock) {
     char *line = NULL;      /* Line read from STDIN */
     size_t len;
     ssize_t read;
@@ -88,8 +94,8 @@ void readUserInput() {
 
         sscanf(line, "%s %s", command, arg);
         if (!strncasecmp(command, "LIST", 4)) {
-            printf("the command you entered was: %s\n", command);
-
+            // printf("the command you entered was: %s\n", command);
+            list(sock, command);
         }
         else if (!strncasecmp(command, "GET", 3)) {
 
@@ -110,9 +116,15 @@ void readUserInput() {
     printf("Shutting down...\n");
 }
 
-void list()
+void list(int sock, char * command)
 {
-
+    if(!(send(sock, command, strlen(command) , 0) < 0))
+    {
+        // puts("Send LIST");
+        // return 1;
+    } else {
+        puts("Send failed");
+    }
 }
 
 int put(char *filename)
@@ -132,7 +144,6 @@ int connectSocket(int port, const char *hostname)
 {
     int sock;
     struct sockaddr_in server;
-    char message[1000] , server_reply[2000];
      
     //Create socket
     sock = socket(AF_INET , SOCK_STREAM , 0);
@@ -140,20 +151,43 @@ int connectSocket(int port, const char *hostname)
     {
         printf("Could not create socket");
     }
-    puts("Socket created");
+    // puts("Socket created");
      
     server.sin_addr.s_addr = inet_addr(hostname);
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
  
     //Connect to remote server
-    if (connect(sock , (struct sockaddr *)&server , sizeof(server)) < 0)
+    if (connect(sock, (struct sockaddr *)&server , sizeof(server)) < 0)
     {
         perror("connect failed. Error");
         return 1;
     }
     printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
-    return 0;
+
+    //  while(1)
+    // {
+    //     printf("Enter message : ");
+    //     scanf("%s" , message);
+         
+    //     //Send some data
+    //     if( send(sock , message , strlen(message) , 0) < 0)
+    //     {
+    //         puts("Send failed");
+    //         return 1;
+    //     }
+         
+    //     //Receive a reply from the server
+    //     if( recv(sock , server_reply , 2000 , 0) < 0)
+    //     {
+    //         puts("recv failed");
+    //         break;
+    //     }
+         
+    //     puts("Server reply :");
+    //     puts(server_reply);
+    // }
+    return sock;
 }
 
 
@@ -162,19 +196,26 @@ int main(int argc, char *argv[], char **envp)
     if(argv[1])
     {
         int num_servers;
+        int server_fd[64];
 
+        // Get the number of servers
         num_servers = parseConfFile(argv[1]);
-        // printf("%s\n",servers[1].host );
-        // printf("%d\n",servers[1].port );
+
+        // Try to connect to the following servers.
         printf("There are %d servers in the config file.\n", num_servers);
-        printf("Attempting to connect...\n");
+        printf("Attempting to connect...\n\n");
         for (int i = 0; i < num_servers; ++i)
         {
             // printf("%d\n", servers[i].port);
             // printf("%s\n", servers[i].host);
-            connectSocket(servers[i].port, servers[i].host);
+            server_fd[i] = connectSocket(servers[i].port, servers[i].host);
         }
-        readUserInput();
+
+        // Try to connect to one of the servers
+        for (int i = 0; i < num_servers; i++)
+        {
+            readUserInput(server_fd[i]);
+        }
     }
     else
     {

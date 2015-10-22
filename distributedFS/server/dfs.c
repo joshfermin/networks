@@ -21,6 +21,7 @@ void parseConfFile(const char *);
 void processRequest(int);
 int countLines(const char *);
 int listenOnPort(int);
+void *connection_handler(void *);
 int readLine(int, char *, int);
 
 void parseConfFile(const char *filename)
@@ -87,40 +88,42 @@ int readLine(int fd, char * buf, int maxlen)
     return n+1;
 }
 
-void processRequest(int connection)
+void processRequest(int socket)
 {
     char command[4096] = ""; 
     char * token;
     char username[256];
     char passwd[256];
+    int read_size;
+    printf("IN process\n");
 
-    while(1) {
-
+    while((read_size = recv(socket , command , 2000 , 0)) > 0 )
+    { 
         //Read Command, Host and Keep-Alive
-        readLine(connection, command, 4096);
+        // readLine(socket, command, 4096);
 
         printf("Line: %s\n", command);
 
         //Grab UserName and Password
-        token = strtok(command, " ");
+        // token = strtok(command, " ");
 
-        token = strtok(NULL, " ");
-        if (token == NULL){
-            write(connection, "Invalid Command Format. Please try again.\n", 42);
-            close(connection);
-            return;
-        }
-        strcpy(username, token);
+        // token = strtok(NULL, " ");
+        // if (token == NULL){
+        //     write(socket, "Invalid Command Format. Please try again.\n", 42);
+        //     close(socket);
+        //     return;
+        // }
+        // strcpy(username, token);
 
-        token = strtok(NULL, " ");
-        if (token == NULL){
-            write(connection, "Invalid Command Format. Please try again.\n", 42);
-            close(connection);
-            return;
-        }
-        strcpy(passwd, token);
+        // token = strtok(NULL, " ");
+        // if (token == NULL){
+        //     write(socket, "Invalid Command Format. Please try again.\n", 42);
+        //     close(socket);
+        //     return;
+        // }
+        // strcpy(passwd, token);
 
-        token = strtok(NULL, " ");
+        // token = strtok(NULL, " ");
 
         //Check Username and Password
         // if (checkUser(username, passwd) == 0){
@@ -149,66 +152,78 @@ void processRequest(int connection)
 
         }else {
             printf("Unsupported Command: %s\n", command);
-            close(connection);
+            close(socket);
             return;
 
         }
     }
+    if(read_size == 0)
+	{
+        puts("Client disconnected");
+        fflush(stdout);
+	}
 }
 
 int listenOnPort(int port) 
 {
-	int one = 1, client_fd, status;
-
-	// sockaddr: structure to contain an internet address.
-	struct sockaddr_in svr_addr, cli_addr;
-	socklen_t sin_len = sizeof(cli_addr);
-
-	// create endpoint for comm, AF_INET (IPv4 Internet Protocol), 
-	// SOCK_STREAM (Provides sequenced, reliable, two-way, connection-based byte streams),
-	int sock = socket(AF_INET, SOCK_STREAM, 0); // returns file descriptor for new socket
-	// if (sock < 0)
-	//   err(1, "cant open socket");
-
-	// (int socket SOL_SOCKET to set options at socket level, allows reuse of local addresses,
-	// option value, size of socket)
-	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
-	// setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
-
-	svr_addr.sin_family = AF_INET;
-	svr_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	svr_addr.sin_port = htons(port); // host to network short (htons)
-
-	// Start server
-	if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
-		close(sock);
-	}
- 
-	listen(sock, 200); // 5 is backlog - limits amount of connections in socket listen queue
-	printf("listening on localhost with port %d\n", port);
-
-
-	while (1)
-	{
-		client_fd = accept(sock, (struct sockaddr *)&cli_addr, &sin_len);
-		// printf("got connection\n");
-			if(fork() == 0){
-				/* Perform the client’s request in the child process. */
-				processRequest(client_fd);
-				exit(0);
-			}
-			close(client_fd);
-
-			/* Collect dead children, but don’t wait for them. */
-			waitpid(-1, &status, WNOHANG);
-		// if (pthread_hread_create");
-	}
-	close(sock);
+	    int socket_desc , client_sock , c , *new_sock;
+    struct sockaddr_in server , client;
+     
+    //Create socket
+    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    if (socket_desc == -1)
+    {
+        printf("Could not create socket");
+    }
+    puts("Socket created");
+     
+    //Prepare the sockaddr_in structure
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_port = htons( port );
+     
+    //Bind
+    if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
+    {
+        //print the error message
+        perror("bind failed. Error");
+        return 1;
+    }
+    puts("bind done");
+     
+    //Listen
+    listen(socket_desc , 3);
+     
+    //Accept and incoming connection
+    puts("Waiting for incoming connections...");
+    c = sizeof(struct sockaddr_in);
+    while( (client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)) )
+    {
+        puts("Connection accepted");
+        new_sock = malloc(1);
+        *new_sock = client_sock;
+         
+        if(fork() == 0){
+	        printf("Connected! %d\n", server_port);         
+	        processRequest(client_sock);    
+	        exit(0);    	
+        }
+         
+        //Now join the thread , so that we dont terminate before the thread
+        //pthread_join( sniffer_thread , NULL);
+        puts("Handler assigned");
+    }
+     
+    if (client_sock < 0)
+    {
+        perror("accept failed");
+        return 1;
+    }
+    return 0;
 }
 
 int main(int argc, char *argv[], char **envp)
 {
-	int client_fd, status;
 	if(argc != 3)
 	{
 		printf("Please check your arguments.");
@@ -224,25 +239,25 @@ int main(int argc, char *argv[], char **envp)
     parseConfFile("server/dfs.conf");
 
     int sock;
-    socklen_t client_len = sizeof(struct sockaddr_in);
-    struct sockaddr_in client_addr;
+    // socklen_t client_len = sizeof(struct sockaddr_in);
+    // struct sockaddr_in client_addr;
 
     sock = listenOnPort(server_port);
 
 
-    // 
-    while (1) {
-        client_fd = accept(sock, (struct sockaddr*)&client_addr, &client_len);
-        if(fork() == 0){
-	        printf("Connected! %d\n", server_port);         
-	        processRequest(client_fd);    
-	        exit(0);    	
-        }
-        close(client_fd);
+  //   // 
+  //   while (1) {
+  //       client_fd = accept(sock, (struct sockaddr*)&client_addr, &client_len);
+  //       if(fork() == 0){
+	 //        printf("Connected! %d\n", server_port);         
+	 //        processRequest(client_fd);    
+	 //        exit(0);    	
+  //       }
+  //       close(client_fd);
 
-        /* Collect dead children, but don’t wait for them. */
-		waitpid(-1, &status, WNOHANG);
-    }
+  //       /* Collect dead children, but don’t wait for them. */
+		// waitpid(-1, &status, WNOHANG);
+  //   }
 
     return 1;
 }
