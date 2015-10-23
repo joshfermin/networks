@@ -1,3 +1,9 @@
+// Distributed File System
+// By: Josh Fermin
+// 
+// Followed:
+// http://www.binarytides.com/server-client-example-c-sockets-linux/
+
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -15,6 +21,7 @@
 
 
 #include "configdfs.h"
+
 user *users;
 user currUser;
 char server_directory[256] = ".";
@@ -28,8 +35,7 @@ void parseConfFile(const char *);
 void processRequest(int);
 int countLines(const char *);
 int listenOnPort(int);
-int readLine(int, char *, int);
-int checkUser(int, char *, char *);
+int authenticateUser(int, char *, char *);
 
 void parseConfFile(const char *filename)
 {
@@ -56,8 +62,6 @@ void parseConfFile(const char *filename)
 
         token = strtok(NULL, " ");
         strcpy(users[i].password,token);
-
-        // printf("Name: %s Password: %s\n",users[i].name, users[i].password);
         i++;
     }
     fclose(conf_file);
@@ -80,23 +84,9 @@ int countLines(const char *filename)
 	return lines;
 }
 
-
-int readLine(int fd, char * buf, int maxlen)
-{
-    int nc, n = 0;
-    for(n=0; n < maxlen-1; n++)
-    {
-        nc = read(fd, &buf[n], 1);
-        if( nc <= 0) return nc;
-        if(buf[n] == '\n') break;
-    }
-    buf[n+1] = 0;
-    return n+1;
-}
-
 void processRequest(int socket)
 {
-    char command[4096]; 
+    char command[2000]; 
     char * token;
     int read_size;
 
@@ -130,7 +120,7 @@ void processRequest(int socket)
 	        strcpy(passwd, token);
 
             //Check Username and Password
-	        if (checkUser(socket, username, passwd) == 0){
+	        if (authenticateUser(socket, username, passwd) == 0){
 	            write(socket, "Invalid Username/Password. Please try again.\n", 45);
 	            close(socket);
 	            return;
@@ -140,24 +130,18 @@ void processRequest(int socket)
 
         // Check Command
         if (strncmp(command, "GET", 3) == 0) {
-            //Token File Name
             printf("GET CALLED!\n");
             // getFile(command, connection);
         } else if(strncmp(command, "LIST", 4) == 0) {
-            //List Call
-            printf("LIST Called!\n");
-            // listFiles(username);
+        	write(socket , command , strlen(command));
+            printf("LIST CALLED:\n");
+            // server_list(username);
         } else if(strncmp(command, "PUT", 3) == 0){
             //Put Call
             printf("PUT Called!\n");
 
         } else if(strncmp(command, "LOGIN", 4) == 0) {
-          	if (checkUser(socket, username, passwd) == 0){
-          		printf("Invalid username/password");
-	            write(socket, "Invalid Username/Password. Please try again.\n", 45);
-	            close(socket);
-	            return;
-	        }
+          	
         } else {
             printf("Unsupported Command: %s\n", command);
         }
@@ -177,39 +161,25 @@ void processRequest(int socket)
     return;
 }
 
-int checkUser(int socket, char * username, char * password) 
+int authenticateUser(int socket, char * username, char * password) 
 {
     int i;
-    DIR * d;
     char directory[4096];
 
     strcpy(directory, server_directory);
     strcat(directory, username);
-
-    if (strtok(password, "\n") != NULL){
-        // printf("We Must Strip!\n");
-        password = strtok(password, "\n"); 
-    }
-
-    printf("IName: %s IPass: %s\n", username, password );
-
+	// printf("curName: %s curPass: %s\n", username, password );
     for (i = 0; i < num_users; i++){
-        printf("Name: %s Pass: %s\n", users[i].name, users[i].password);
+    	// printf("Name: %s Pass: %s\n", users[i].name, users[i].password);
         if (strncmp(users[i].name, username, strlen(users[i].name)) == 0){
         	if(strncmp(users[i].password, password, strlen(password)) == 0)
         	{
 	            currUser = users[i];
-	            printf("We found the correct user!\n");
-	            d = opendir(directory);
-
-	            if(!d) {
-
-	                printf("Directory Doesn't Exist. Creating!\n");
+	            if(!opendir(directory)) {
 	                write(socket, "Directory Doesn't Exist. Creating!\n", 35);
-
 	                mkdir(directory, 0770);
 	            }
-
+	            printf("user authenticated");
 	            return 1;
         	}
         }
@@ -217,9 +187,12 @@ int checkUser(int socket, char * username, char * password)
     return 0;
 }
 
+
+
+
 int listenOnPort(int port) 
 {
-	int socket_desc , client_sock , c , *new_sock;
+	int socket_desc , client_sock, c, *new_sock;
     struct sockaddr_in server , client;
      
     //Create socket

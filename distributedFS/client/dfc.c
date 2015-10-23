@@ -87,6 +87,7 @@ void readUserInput(int sock) {
     ssize_t read;
     char command[8], arg[64];
     int status = 1;
+    char server_reply[2000];
 
 
     while (status) {
@@ -115,6 +116,15 @@ void readUserInput(int sock) {
         else{
             printf("Invalid command. Type \"HELP\" for more options.\n");
         }
+
+        if( recv(sock , server_reply , 2000 , 0) < 0)
+        {
+            puts("recv failed");
+            break;
+        } else {
+            puts("Server reply :");
+            puts(server_reply);
+        }
     }
     printf("Shutting down...\n");
 }
@@ -126,18 +136,16 @@ void authenticateUser(int sock, char * username, char * password)
     strcat(result, username);
     strcat(result, " ");
     strcat(result, password);
-    printf("%s\n", result);
-    if(!(write(sock, result, strlen(result)) < 0))
+    if(write(sock, result, strlen(result)) < 0)
     {
-
+        puts("Authentication failed");
     }
     // return true;
 }
 
 void list(int sock, char * command)
 {
-    printf("%s\n", command);
-    if(!(send(sock, command, strlen(command) , 0) < 0))
+    if(!(write(sock, command, strlen(command)) < 0))
     {
         // puts("Send LIST");
         // return 1;
@@ -195,7 +203,7 @@ int main(int argc, char *argv[], char **envp)
     if(argv[1])
     {
         int num_servers;
-        int server_fd[64];
+        // int server_fd[64];
 
         // Get the number of servers
         num_servers = parseConfFile(argv[1]);
@@ -207,13 +215,18 @@ int main(int argc, char *argv[], char **envp)
         {
             // printf("%d\n", servers[i].port);
             // printf("%s\n", servers[i].host);
-            server_fd[i] = connectSocket(servers[i].port, servers[i].host);
+            servers[i].fd = connectSocket(servers[i].port, servers[i].host);
         }
 
         // Try to connect to one of the servers
         for (int i = 0; i < num_servers; i++)
         {
-            readUserInput(server_fd[i]);
+            if(servers[i].fd)
+            {
+                readUserInput(servers[i].fd);
+                // connection found, break out of loop.
+                break;
+            }
         }
     }
     else
