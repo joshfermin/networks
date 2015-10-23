@@ -113,7 +113,7 @@ void processRequest(int socket)
         if (strncmp(command, "LOGIN:", 6) == 0)
         {
         	token = strtok(command, ": ");
-	        // token = strtok(NULL, " ");
+	        token = strtok(NULL, " ");
 	        if (token == NULL){
 	            write(socket, "Invalid Command Format. Please try again.\n", 42);
 	            close(socket);
@@ -128,7 +128,6 @@ void processRequest(int socket)
 	            return;
 	        }
 	        strcpy(passwd, token);
-	        token = strtok(NULL, " ");
 
             //Check Username and Password
 	        if (checkUser(socket, username, passwd) == 0){
@@ -154,6 +153,7 @@ void processRequest(int socket)
 
         } else if(strncmp(command, "LOGIN", 4) == 0) {
           	if (checkUser(socket, username, passwd) == 0){
+          		printf("Invalid username/password");
 	            write(socket, "Invalid Username/Password. Please try again.\n", 45);
 	            close(socket);
 	            return;
@@ -214,7 +214,6 @@ int checkUser(int socket, char * username, char * password)
         	}
         }
     }
-
     return 0;
 }
 

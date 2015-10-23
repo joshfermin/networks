@@ -121,15 +121,13 @@ void readUserInput(int sock) {
 
 void authenticateUser(int sock, char * username, char * password)
 {
-    printf("%s\n", password);
-    char *result = malloc(strlen(username)+strlen(password)+3);//+1 for the zero-terminator
+    char *result = malloc(strlen(username)+strlen(password));//+1 for the zero-terminator
     strcpy(result, "LOGIN:");
     strcat(result, username);
     strcat(result, " ");
     strcat(result, password);
     printf("%s\n", result);
-    
-    if(!(send(sock, result, strlen(result), 0) < 0))
+    if(!(write(sock, result, strlen(result)) < 0))
     {
 
     }
