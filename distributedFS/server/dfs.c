@@ -11,18 +11,25 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <dirent.h>
+
 
 #include "configdfs.h"
 user *users;
+user currUser;
 char server_directory[256] = ".";
 int server_port;
+int num_users = 0;
+char username[256];
+char passwd[256];
+
 
 void parseConfFile(const char *);
 void processRequest(int);
 int countLines(const char *);
 int listenOnPort(int);
-void *connection_handler(void *);
 int readLine(int, char *, int);
+int checkUser(int, char *, char *);
 
 void parseConfFile(const char *filename)
 {
@@ -30,7 +37,6 @@ void parseConfFile(const char *filename)
     char * token;
     size_t len = 0;
     int read_len = 0;
-    int num_users = 0;
     int i=0;
 
     // open config file for reading
@@ -90,14 +96,13 @@ int readLine(int fd, char * buf, int maxlen)
 
 void processRequest(int socket)
 {
-    char command[4096] = ""; 
+    char command[4096]; 
     char * token;
-    char username[256];
-    char passwd[256];
     int read_size;
-    printf("IN process\n");
 
-    while((read_size = recv(socket , command , 2000 , 0)) > 0 )
+    // printf("im here in processRequest");
+
+    while((read_size = recv(socket, command, 2000, 0)) > 0 )
     { 
         //Read Command, Host and Keep-Alive
         // readLine(socket, command, 4096);
@@ -105,32 +110,34 @@ void processRequest(int socket)
         printf("Line: %s\n", command);
 
         //Grab UserName and Password
-        // token = strtok(command, " ");
+        if (strncmp(command, "LOGIN:", 6) == 0)
+        {
+        	token = strtok(command, ": ");
+	        // token = strtok(NULL, " ");
+	        if (token == NULL){
+	            write(socket, "Invalid Command Format. Please try again.\n", 42);
+	            close(socket);
+	            return;
+	        }
+	        strcpy(username, token);
 
-        // token = strtok(NULL, " ");
-        // if (token == NULL){
-        //     write(socket, "Invalid Command Format. Please try again.\n", 42);
-        //     close(socket);
-        //     return;
-        // }
-        // strcpy(username, token);
+	        token = strtok(NULL, " ");
+	        if (token == NULL){
+	            write(socket, "Invalid Command Format. Please try again.\n", 42);
+	            close(socket);
+	            return;
+	        }
+	        strcpy(passwd, token);
+	        token = strtok(NULL, " ");
 
-        // token = strtok(NULL, " ");
-        // if (token == NULL){
-        //     write(socket, "Invalid Command Format. Please try again.\n", 42);
-        //     close(socket);
-        //     return;
-        // }
-        // strcpy(passwd, token);
+            //Check Username and Password
+	        if (checkUser(socket, username, passwd) == 0){
+	            write(socket, "Invalid Username/Password. Please try again.\n", 45);
+	            close(socket);
+	            return;
+	        }
+    	}
 
-        // token = strtok(NULL, " ");
-
-        //Check Username and Password
-        // if (checkUser(username, passwd) == 0){
-        //     write(connection, "Invalid Username/Password. Please try again.\n", 45);
-        //     close(connection);
-        //     return;
-        // } 
 
         // Check Command
         if (strncmp(command, "GET", 3) == 0) {
@@ -145,16 +152,14 @@ void processRequest(int socket)
             //Put Call
             printf("PUT Called!\n");
 
-        } else if(strncmp(command, "CHECK", 5) == 0){
-            //Put Call
-            // checkServer(token, username, passwd);
-            printf("CHECK Called!\n");
-
-        }else {
+        } else if(strncmp(command, "LOGIN", 4) == 0) {
+          	if (checkUser(socket, username, passwd) == 0){
+	            write(socket, "Invalid Username/Password. Please try again.\n", 45);
+	            close(socket);
+	            return;
+	        }
+        } else {
             printf("Unsupported Command: %s\n", command);
-            close(socket);
-            return;
-
         }
     }
     if(read_size == 0)
@@ -162,11 +167,60 @@ void processRequest(int socket)
         puts("Client disconnected");
         fflush(stdout);
 	}
+    else if(read_size == -1)
+    {
+        perror("recv failed");
+    }
+    //Free the socket pointer
+    // free(socket);
+     
+    return;
+}
+
+int checkUser(int socket, char * username, char * password) 
+{
+    int i;
+    DIR * d;
+    char directory[4096];
+
+    strcpy(directory, server_directory);
+    strcat(directory, username);
+
+    if (strtok(password, "\n") != NULL){
+        // printf("We Must Strip!\n");
+        password = strtok(password, "\n"); 
+    }
+
+    printf("IName: %s IPass: %s\n", username, password );
+
+    for (i = 0; i < num_users; i++){
+        printf("Name: %s Pass: %s\n", users[i].name, users[i].password);
+        if (strncmp(users[i].name, username, strlen(users[i].name)) == 0){
+        	if(strncmp(users[i].password, password, strlen(password)) == 0)
+        	{
+	            currUser = users[i];
+	            printf("We found the correct user!\n");
+	            d = opendir(directory);
+
+	            if(!d) {
+
+	                printf("Directory Doesn't Exist. Creating!\n");
+	                write(socket, "Directory Doesn't Exist. Creating!\n", 35);
+
+	                mkdir(directory, 0770);
+	            }
+
+	            return 1;
+        	}
+        }
+    }
+
+    return 0;
 }
 
 int listenOnPort(int port) 
 {
-	    int socket_desc , client_sock , c , *new_sock;
+	int socket_desc , client_sock , c , *new_sock;
     struct sockaddr_in server , client;
      
     //Create socket
@@ -209,8 +263,6 @@ int listenOnPort(int port)
 	        exit(0);    	
         }
          
-        //Now join the thread , so that we dont terminate before the thread
-        //pthread_join( sniffer_thread , NULL);
         puts("Handler assigned");
     }
      
@@ -233,31 +285,17 @@ int main(int argc, char *argv[], char **envp)
 	// create a folder which will hold the contents of the server
     strcat(server_directory, argv[1]);
     strcat(server_directory, "/");
-    mkdir(server_directory, 0770);
+    if(!opendir(server_directory))
+    {
+    	mkdir(server_directory, 0770);    	
+    }
+
     server_port = atoi(argv[2]);
 
     parseConfFile("server/dfs.conf");
 
     int sock;
-    // socklen_t client_len = sizeof(struct sockaddr_in);
-    // struct sockaddr_in client_addr;
-
     sock = listenOnPort(server_port);
-
-
-  //   // 
-  //   while (1) {
-  //       client_fd = accept(sock, (struct sockaddr*)&client_addr, &client_len);
-  //       if(fork() == 0){
-	 //        printf("Connected! %d\n", server_port);         
-	 //        processRequest(client_fd);    
-	 //        exit(0);    	
-  //       }
-  //       close(client_fd);
-
-  //       /* Collect dead children, but don’t wait for them. */
-		// waitpid(-1, &status, WNOHANG);
-  //   }
 
     return 1;
 }

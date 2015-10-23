@@ -19,15 +19,17 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+// #include <stdbool.h>
 
 #include "configdfc.h"
 
 int parseConfFile(const char *);
 void readUserInput(int);
 int connectSocket(int, const char *);
-void list();
+void list(int, char *);
 int put(char *filename);
 int get(char *filename);
+void authenticateUser(int, char *, char *);
 
 char username[128];
 char password[128];
@@ -48,7 +50,7 @@ int parseConfFile(const char *filename)
     servers = malloc(4 * sizeof(server));
 
     while((read_len = getline(&line, &len, conf_file)) != -1) {
-        line[read_len-1] = '\0';
+        line[read_len+1] = '\0';
         if (line[0] == '#')
             continue;
 
@@ -93,6 +95,7 @@ void readUserInput(int sock) {
         line[read-1] = '\0';
 
         sscanf(line, "%s %s", command, arg);
+
         if (!strncasecmp(command, "LIST", 4)) {
             // printf("the command you entered was: %s\n", command);
             list(sock, command);
@@ -116,8 +119,26 @@ void readUserInput(int sock) {
     printf("Shutting down...\n");
 }
 
+void authenticateUser(int sock, char * username, char * password)
+{
+    printf("%s\n", password);
+    char *result = malloc(strlen(username)+strlen(password)+3);//+1 for the zero-terminator
+    strcpy(result, "LOGIN:");
+    strcat(result, username);
+    strcat(result, " ");
+    strcat(result, password);
+    printf("%s\n", result);
+    
+    if(!(send(sock, result, strlen(result), 0) < 0))
+    {
+
+    }
+    // return true;
+}
+
 void list(int sock, char * command)
 {
+    printf("%s\n", command);
     if(!(send(sock, command, strlen(command) , 0) < 0))
     {
         // puts("Send LIST");
@@ -163,30 +184,10 @@ int connectSocket(int port, const char *hostname)
         perror("connect failed. Error");
         return 1;
     }
-    printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
 
-    //  while(1)
-    // {
-    //     printf("Enter message : ");
-    //     scanf("%s" , message);
-         
-    //     //Send some data
-    //     if( send(sock , message , strlen(message) , 0) < 0)
-    //     {
-    //         puts("Send failed");
-    //         return 1;
-    //     }
-         
-    //     //Receive a reply from the server
-    //     if( recv(sock , server_reply , 2000 , 0) < 0)
-    //     {
-    //         puts("recv failed");
-    //         break;
-    //     }
-         
-    //     puts("Server reply :");
-    //     puts(server_reply);
-    // }
+    authenticateUser(sock, username, password);
+
+    printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
     return sock;
 }
 

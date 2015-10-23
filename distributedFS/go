@@ -4,6 +4,10 @@ make clean
 echo "make..."
 make
 
+echo "killing old processes..."
+pkill -f dfs
+pkill -f dfc
+
 read -r -p "Do you want to start the dfs servers? [y/N] " response
 if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]
 then
