@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -g -lpthread 
+CFLAGS = -Wall -g -lpthread -lssl -lcrypto
 client_dir = client/dfc.c
 server_dir = server/dfs.c
 server_commands = server/commands.c

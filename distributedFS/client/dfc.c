@@ -5,7 +5,7 @@
 // http://www.binarytides.com/server-client-example-c-sockets-linux/
 
 #include <stdio.h>
-#include <sys/errno.h>
+#include <sys/errno.h> // for errexit
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -20,10 +20,10 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <fcntl.h> //(for O_*)
 // #include <stdbool.h>
 
 #include "configdfc.h"
-
 #define MAX_BUFFER 2000
 
 int parseConfFile(const char *);
@@ -34,7 +34,9 @@ int put(int, char *);
 int get(int, char *);
 void authenticateUser(int, char *, char *);
 int errexit(const char *format, ...);
+void recieveReplyFromServer(int sock);
 
+const char *FILE_DIR="./files";
 char username[128];
 char password[128];
 server * servers; 
@@ -93,9 +95,6 @@ void readUserInput(int sock) {
     ssize_t read;
     char command[8], arg[64];
     int status = 1;
-    // int server_reply_len = 0;
-    char server_reply[MAX_BUFFER];
-
 
     while (status) {
         printf("%s> ", username);
@@ -103,7 +102,7 @@ void readUserInput(int sock) {
         line[read-1] = '\0';
 
         sscanf(line, "%s %s", command, arg);
-
+        // printf("%lu\n", strlen(line));
         if (!strncasecmp(command, "LIST", 4)) {
             // printf("the command you entered was: %s\n", command);
             // printf("sock num %d\n", sock);
@@ -114,7 +113,10 @@ void readUserInput(int sock) {
             get(sock, command);
         }
         else if (!strncasecmp(command, "PUT", 3)) {
-
+            if (strlen(line) <= 3)
+                printf("Check your args.\n");
+            else
+                put(sock, line);
         }
         else if (!strncasecmp(command, "QUIT", 4) || !strncasecmp(command, "EXIT", 4)) {
             status = 0;
@@ -125,18 +127,21 @@ void readUserInput(int sock) {
         else{
             printf("Invalid command. Type \"HELP\" for more options.\n");
         }
+    }
+    printf("Shutting down...\n");
+}
 
-        if( recv(sock, server_reply, 2000, 0) < 0)
-        {
-            errexit("Error in recv: %s\n", strerror(errno));
-            // puts("recv failed");
-            break;
-        }
-        // server_reply[len] = '\0';
+void recieveReplyFromServer(int sock){
+    char server_reply[MAX_BUFFER];
+    if( recv(sock, server_reply, 2000, 0) < 0)
+    {
+        errexit("Error in recv: %s\n", strerror(errno));
+        // puts("recv failed");
+    } else {
+        // server_reply[len] = '\0'; // null terminate server_reply
         puts("Server reply :");
         puts(server_reply);
     }
-    printf("Shutting down...\n");
 }
 
 void authenticateUser(int sock, char * username, char * password)
@@ -153,19 +158,91 @@ void authenticateUser(int sock, char * username, char * password)
     }
 }
 
-void list(int sock, char * command)
+void list(int sock, char *command)
 {
     if(write(sock, command, strlen(command)) < 0) {
         // puts("List failed");
         errexit("Error in List: %s\n", strerror(errno));
-
     }
+
+    recieveReplyFromServer(sock);
 }
 
-int put(int sock, char *filename)
+// send file via socket
+// http://stackoverflow.com/questions/2014033/send-and-receive-a-file-in-socket-programming-in-linux-with-c-c-gcc-g
+int put(int sock, char *line)
 {
+    struct timespec tim;
+    tim.tv_sec = 0;
+    tim.tv_nsec = 100000000L; /* 0.1 seconds */
 
-    return 0;
+    char file_loc[128];
+    int fd;
+    struct stat file_stat;
+    char command[8], arg[64];
+    char buffer[MAX_BUFFER];
+    char file_size[256];        /* Amount of bytes to take from file */
+    char server_reply[MAX_BUFFER];
+
+
+    sscanf(line, "%s %s", command, arg);
+    sprintf(file_loc, "%s/%s", FILE_DIR, arg);
+
+    if(write(sock, line, strlen(line)) < 0) {
+        // puts("List failed");
+        errexit("Error in List: %s\n", strerror(errno));
+    }
+
+    if ((fd = open(file_loc, O_RDONLY)) < 0)
+        errexit("Failed to open file at: '%s' %s\n", file_loc, strerror(errno)); 
+
+    if (fstat(fd, &file_stat) < 0)
+        errexit("Error fstat file at: '%s' %s\n", file_loc, strerror(errno));
+
+    // nanosleep(&tim, NULL);
+    // printf("here we go");
+    
+    if(recv(sock, server_reply, 2000, 0) < 0)
+    {
+        puts(server_reply);
+        if (write(sock, file_stat.st_size, sizeof(file_stat.st_size)) < 0)
+            errexit("Echo write: %s\n", strerror(errno));
+
+        // nanosleep(&tim, NULL); 
+
+        while (1) {
+            // Read data into buffer.  We may not have enough to fill up buffer, so we
+            // store how many bytes were actually read in bytes_read.
+            int bytes_read = read(fd, buffer, sizeof(buffer));
+            if (bytes_read == 0) // We're done reading from the file
+                break;
+
+            if (bytes_read < 0) {
+                // handle errors
+            }
+
+            // You need a loop for the write, because not all of the data may be written
+            // in one call; write will return how many bytes were written. p keeps
+            // track of where in the buffer we are, while we decrement bytes_read
+            // to keep track of how many bytes are left to write.
+            void *p = buffer;
+            while (bytes_read > 0) {
+                int bytes_written = write(sock, p, bytes_read);
+                if (bytes_written <= 0) {
+                    // handle errors
+                }
+                bytes_read -= bytes_written;
+                p += bytes_written;
+            }
+        }
+    }
+
+    // recieveReplyFromServer(sock);
+    // while (((sent = sendfile(sock, fd, &offset, BUFSIZE)) >= 0) && (remaining > 0)) {
+    //     remaining -= sent;
+    //     printf("%d bytes sent. %d bytes remaining\n", sent, remaining);
+    // }
+    return 0;   
 }
 
 int get(int sock, char *filename)
@@ -247,6 +324,7 @@ int main(int argc, char *argv[], char **envp)
                 break;
             }
         }
+        return 1;
     }
     else
     {
