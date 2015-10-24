@@ -23,12 +23,14 @@
 
 #include "configdfc.h"
 
+#define MAX_BUFFER 2000
+
 int parseConfFile(const char *);
 void readUserInput(int);
 int connectSocket(int, const char *);
 void list(int, char *);
-int put(char *filename);
-int get(char *filename);
+int put(int, char *);
+int get(int, char *);
 void authenticateUser(int, char *, char *);
 
 char username[128];
@@ -87,7 +89,7 @@ void readUserInput(int sock) {
     ssize_t read;
     char command[8], arg[64];
     int status = 1;
-    char server_reply[2000];
+    char server_reply[MAX_BUFFER];
 
 
     while (status) {
@@ -102,7 +104,7 @@ void readUserInput(int sock) {
             list(sock, command);
         }
         else if (!strncasecmp(command, "GET", 3)) {
-
+            get(sock, command);
         }
         else if (!strncasecmp(command, "PUT", 3)) {
 
@@ -117,14 +119,12 @@ void readUserInput(int sock) {
             printf("Invalid command. Type \"HELP\" for more options.\n");
         }
 
-        if( recv(sock , server_reply , 2000 , 0) < 0)
-        {
+        if( recv(sock, server_reply , 2000 , 0) < 0) {
             puts("recv failed");
             break;
-        } else {
-            puts("Server reply :");
-            puts(server_reply);
         }
+        puts("Server reply :");
+        puts(server_reply);
     }
     printf("Shutting down...\n");
 }
@@ -136,7 +136,7 @@ void authenticateUser(int sock, char * username, char * password)
     strcat(result, username);
     strcat(result, " ");
     strcat(result, password);
-    if(write(sock, result, strlen(result)) < 0)
+    if(!(write(sock, result, strlen(result)) < 0)
     {
         puts("Authentication failed");
     }
@@ -154,13 +154,13 @@ void list(int sock, char * command)
     }
 }
 
-int put(char *filename)
+int put(int sock, char *filename)
 {
 
     return 0;
 }
 
-int get(char *filename)
+int get(int sock, char *filename)
 {
 
     return 0;
@@ -203,6 +203,7 @@ int main(int argc, char *argv[], char **envp)
     if(argv[1])
     {
         int num_servers;
+        int i;
         // int server_fd[64];
 
         // Get the number of servers
@@ -211,7 +212,7 @@ int main(int argc, char *argv[], char **envp)
         // Try to connect to the following servers.
         printf("There are %d servers in the config file.\n", num_servers);
         printf("Attempting to connect...\n\n");
-        for (int i = 0; i < num_servers; ++i)
+        for (i = 0; i < num_servers; ++i)
         {
             // printf("%d\n", servers[i].port);
             // printf("%s\n", servers[i].host);
@@ -219,7 +220,7 @@ int main(int argc, char *argv[], char **envp)
         }
 
         // Try to connect to one of the servers
-        for (int i = 0; i < num_servers; i++)
+        for (i = 0; i < num_servers; i++)
         {
             if(servers[i].fd)
             {
