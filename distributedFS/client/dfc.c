@@ -110,7 +110,10 @@ void readUserInput(int sock) {
             
         }
         else if (!strncasecmp(command, "GET", 3)) {
-            get(sock, command);
+            if (strlen(line) <= 3)
+                printf("Check your args.\n");
+            else
+                get(sock, line);
         }
         else if (!strncasecmp(command, "PUT", 3)) {
             if (strlen(line) <= 3)
@@ -245,9 +248,26 @@ int put(int sock, char *line)
     return 0;   
 }
 
-int get(int sock, char *filename)
+int get(int sock, char *line)
 {
+    char buf[MAX_BUFFER];
+    int read_size    = 0;
+    int len = 0;
 
+    if(write(sock, line, strlen(line)) < 0) {
+        // puts("List failed");
+        errexit("Error in List: %s\n", strerror(errno));
+    }
+    while ((read_size = recv(sock, &buf[len], (MAX_BUFFER-len), 0)) > 0)
+    { 
+        char line[read_size];
+        strncpy(line, &buf[len], sizeof(line));
+        len += read_size;
+        line[read_size] = '\0';
+
+        printf("Found:  %s\n", line);
+        return 1;
+    }
     return 0;
 }
 

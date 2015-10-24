@@ -46,36 +46,37 @@ int requestFileCheck(char * filename);
 int errexit(const char *format, ...);
 void processRequest(int socket);
 int readline(int fd, char * buf, int maxlen);
+void serverGet(int sock, char * filename);
 
 
 void parseConfFile(const char *filename)
 {
-    char * line = NULL;
-    char * token;
-    size_t len = 0;
-    int read_len = 0;
-    int i=0;
+	char * line = NULL;
+	char * token;
+	size_t len = 0;
+	int read_len = 0;
+	int i=0;
 
-    // open config file for reading
-    FILE *conf_file = fopen(filename, "r");
-    if (conf_file == NULL)
-        fprintf(stderr, "Could not open file.");
+	// open config file for reading
+	FILE *conf_file = fopen(filename, "r");
+	if (conf_file == NULL)
+		fprintf(stderr, "Could not open file.");
 
-    // get number of users
-    num_users = countLines(filename);
-    // printf("%d\n", num_users);
-    users = malloc(num_users * sizeof(user));
+	// get number of users
+	num_users = countLines(filename);
+	// printf("%d\n", num_users);
+	users = malloc(num_users * sizeof(user));
 
-    // for each line in config, add new user struct
-    while((read_len = getline(&line, &len, conf_file)) != -1) {
-        token = strtok(line, " ");
-        strcpy(users[i].name, token);
+	// for each line in config, add new user struct
+	while((read_len = getline(&line, &len, conf_file)) != -1) {
+		token = strtok(line, " ");
+		strcpy(users[i].name, token);
 
-        token = strtok(NULL, " ");
-        strcpy(users[i].password,token);
-        i++;
-    }
-    fclose(conf_file);
+		token = strtok(NULL, " ");
+		strcpy(users[i].password,token);
+		i++;
+	}
+	fclose(conf_file);
 }
 
 int countLines(const char *filename)
@@ -97,285 +98,327 @@ int countLines(const char *filename)
 
 void processRequest(int socket)
 {
-    char buf[MAX_BUFFER];
-    char arg[64];
-    char *token;
-    char username[32], passwd[32];
-    int read_size    = 0;
-    int len = 0;
-    char command[256];
+	char buf[MAX_BUFFER];
+	char arg[64];
+	char *token;
+	char username[32], passwd[32];
+	int read_size    = 0;
+	int len = 0;
+	char command[256];
 
-    while ((read_size = recv(socket, &buf[len], (MAX_BUFFER-len), 0)) > 0)
-    { 
-        char line[read_size];
-        strncpy(line, &buf[len], sizeof(line));
-        len += read_size;
-        line[read_size] = '\0';
+	while ((read_size = recv(socket, &buf[len], (MAX_BUFFER-len), 0)) > 0)
+	{ 
+		char line[read_size];
+		strncpy(line, &buf[len], sizeof(line));
+		len += read_size;
+		line[read_size] = '\0';
 
-        printf("Found:  %s\n", line);
+		printf("Found:  %s\n", line);
 
-        // printf("Line: %s\n", command);
-        if (strncmp(line, "LOGIN:", 6) == 0)
-        {
-        	token = strtok(line, ": ");
-	        token = strtok(NULL, " ");
-            if (token == NULL){
-                write(socket, "Invalid Command Format. Please try again.\n", 42);
-                close(socket);
-                return;
-            }
-	        strcpy(username, token);
-            if (token == NULL){
-                write(socket, "Invalid Command Format. Please try again.\n", 42);
-                close(socket);
-                return;
-            }
-	        token = strtok(NULL, " ");
-	        strcpy(passwd, token);
+		// printf("Line: %s\n", command);
+		if (strncmp(line, "LOGIN:", 6) == 0)
+		{
+			token = strtok(line, ": ");
+			token = strtok(NULL, " ");
+			if (token == NULL){
+				write(socket, "Invalid Command Format. Please try again.\n", 42);
+				close(socket);
+				return;
+			}
+			strcpy(username, token);
+			if (token == NULL){
+				write(socket, "Invalid Command Format. Please try again.\n", 42);
+				close(socket);
+				return;
+			}
+			token = strtok(NULL, " ");
+			strcpy(passwd, token);
+		}
 
-    	}
+		sscanf(line, "%s %s", command, arg);
+		// printf("%s\n", command);
+		// printf("%s\n", arg);
 
-        sscanf(line, "%s %s", command, arg);
-        // printf("%s\n", command);
-        // printf("%s\n", arg);
-
-        // Check Command
-        if (strncmp(command, "GET", 3) == 0) {
-            printf("GET CALLED!\n");
-            // getFile(command, connection);
-        } else if(strncmp(command, "LIST", 4) == 0) {
-            printf("LIST CALLED:\n");
-        	// send(socket, command , strlen(command), 0);
-            serverList(socket, username);
-        } else if(strncmp(command, "PUT", 3) == 0){
-            //Put Call
-            printf("PUT Called!\n");
-            serverPut(socket, arg);
-        } else if(strncmp(command, "LOGIN", 4) == 0) {
-                        //Check Username and Password
-            if (authenticateUser(socket, username, passwd) == 0){
-                char *message = "Invalid Username/Password. Please try again.\n";
-                write(socket, message, strlen(message));
-                close(socket);
-                return;
-            }
-        } else {
-            printf("Unsupported Command: %s\n", command);
-        }
-    }
-    if(read_size == 0)
-	{
-        puts("Client disconnected");
-        fflush(stdout);
+		// Check Command
+		if (strncmp(command, "GET", 3) == 0) {
+			printf("GET CALLED!\n");
+			serverGet(socket, arg);
+			// getFile(command, connection);
+		} else if(strncmp(command, "LIST", 4) == 0) {
+			printf("LIST CALLED:\n");
+			// send(socket, command , strlen(command), 0);
+			serverList(socket, username);
+		} else if(strncmp(command, "PUT", 3) == 0){
+			//Put Call
+			printf("PUT Called!\n");
+			serverPut(socket, arg);
+		} else if(strncmp(command, "LOGIN", 4) == 0) {
+						//Check Username and Password
+			if (authenticateUser(socket, username, passwd) == 0){
+				char *message = "Invalid Username/Password. Please try again.\n";
+				write(socket, message, strlen(message));
+				close(socket);
+				return;
+			}
+		} else {
+			printf("Unsupported Command: %s\n", command);
+		}
 	}
-    else if(read_size == -1)
-    {
-        perror("recv failed");
-    }
-     
-    return;
+	if(read_size == 0)
+	{
+		puts("Client disconnected");
+		fflush(stdout);
+	}
+	else if(read_size == -1)
+	{
+		perror("recv failed");
+	}
+	 
+	return;
 }
 
 int authenticateUser(int socket, char * username, char * password) 
 {
-    int i;
-    char directory[4096];
+	int i;
+	char directory[4096];
 
-    strcpy(directory, server_directory);
-    strcat(directory, username);
-    for (i = 0; i < num_users; i++){
-        if (strncmp(users[i].name, username, strlen(username)) == 0){
-        	if(strncmp(users[i].password, password, strlen(password)) == 0)
-        	{
-	            currUser = users[i];
-	            if(!opendir(directory)) {
-	                write(socket, "Directory Doesn't Exist. Creating!\n", 35);
-	                mkdir(directory, 0770);
-	            }
-	            printf("User Authenticated.\n");
-	            return 1;
-        	}
-        }
-    }
-    return 0;
+	strcpy(directory, server_directory);
+	strcat(directory, username);
+	for (i = 0; i < num_users; i++){
+		if (strncmp(users[i].name, username, strlen(username)) == 0){
+			if(strncmp(users[i].password, password, strlen(password)) == 0)
+			{
+				currUser = users[i];
+				if(!opendir(directory)) {
+					write(socket, "Directory Doesn't Exist. Creating!\n", 35);
+					mkdir(directory, 0770);
+				}
+				printf("User Authenticated.\n");
+				return 1;
+			}
+		}
+	}
+	return 0;
 }
 
 
 // Connect to a certain socket
 int connectSocket(int port, const char *hostname)
 {
-    int sock;
-    struct sockaddr_in server;
-     
-    //Create socket
-    sock = socket(AF_INET , SOCK_STREAM , IPPROTO_TCP);
-    if (sock == -1)
-    {
-        printf("Could not create socket");
-    }
-    // puts("Socket created");
-     printf("port num %d\n", port);
-    server.sin_addr.s_addr = inet_addr(hostname);
-    server.sin_family = AF_INET;
-    server.sin_port = htons(port);
+	int sock;
+	struct sockaddr_in server;
+	 
+	//Create socket
+	sock = socket(AF_INET , SOCK_STREAM , IPPROTO_TCP);
+	if (sock == -1)
+	{
+		printf("Could not create socket");
+	}
+	// puts("Socket created");
+	 printf("port num %d\n", port);
+	server.sin_addr.s_addr = inet_addr(hostname);
+	server.sin_family = AF_INET;
+	server.sin_port = htons(port);
  
-    //Connect to remote server
-    if (connect(sock, (struct sockaddr *)&server , sizeof(server)) < 0)
-    {
-        perror("connect failed. Error");
-        return 1;
-    }
+	//Connect to remote server
+	if (connect(sock, (struct sockaddr *)&server , sizeof(server)) < 0)
+	{
+		perror("connect failed. Error");
+		return 1;
+	}
 
-    // authenticateUser(sock, username, password);
+	// authenticateUser(sock, username, password);
 
-    printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
+	printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
 
-    return sock;
+	return sock;
 }
 
 int listenOnPort(int port) 
 {
 	int socket_desc , client_sock, c, *new_sock;
-    struct sockaddr_in server , client;
-     
-    //Create socket
-    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
-    if (socket_desc == -1)
-    {
-        printf("Could not create socket");
-    }
-    puts("Socket created");
-     
-    //Prepare the sockaddr_in structure
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = INADDR_ANY;
-    server.sin_port = htons( port );
-     
-    //Bind
-    if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
-    {
-        //print the error message
-        perror("bind failed. Error");
-        return 1;
-    }
-    puts("bind done");
-     
-    //Listen
-    listen(socket_desc , 3);
-     
-    //Accept and incoming connection
-    puts("Waiting for incoming connections...");
-    c = sizeof(struct sockaddr_in);
-    while((client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)))
-    {
-        puts("Connection accepted");
-        new_sock = malloc(1);
-        *new_sock = client_sock;
-         
-        if(fork() == 0){
-	        printf("Connected! %d\n", server_port);         
-	        processRequest(client_sock);    
-	        exit(0);    	
+	struct sockaddr_in server , client;
+	 
+	//Create socket
+	socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+	if (socket_desc == -1)
+	{
+		printf("Could not create socket");
+	}
+	puts("Socket created");
+	 
+	//Prepare the sockaddr_in structure
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = htons( port );
+	 
+	//Bind
+	if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
+	{
+		//print the error message
+		perror("bind failed. Error");
+		return 1;
+	}
+	puts("bind done");
+	 
+	//Listen
+	listen(socket_desc , 3);
+	 
+	//Accept and incoming connection
+	puts("Waiting for incoming connections...");
+	c = sizeof(struct sockaddr_in);
+	while((client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)))
+	{
+		puts("Connection accepted");
+		new_sock = malloc(1);
+		*new_sock = client_sock;
+		 
+		if(fork() == 0){
+			printf("Connected! %d\n", server_port);         
+			processRequest(client_sock);    
+			exit(0);    	
+		}
+		 
+		puts("Handler assigned");
+	}
+	 
+	if (client_sock < 0)
+	{
+		perror("accept failed");
+		return 1;
+	}
+	return 0;
+}
+
+void serverGet(int sock, char * filename)
+{
+	char file_loc[128];
+	int fd;
+	char buffer[MAX_BUFFER];
+
+	sprintf(file_loc, "%s%s/%s", server_directory, currUser.name, filename);
+
+ 	if ((fd = open(file_loc, O_RDONLY)) < 0)
+        errexit("Failed to open file at: '%s' %s\n", file_loc, strerror(errno)); 
+	while (1) {
+        // Read data into buffer.  We may not have enough to fill up buffer, so we
+        // store how many bytes were actually read in bytes_read.
+        int bytes_read = read(fd, buffer, sizeof(buffer));
+        if (bytes_read == 0) // We're done reading from the file
+            break;
+
+        if (bytes_read < 0) {
+            // handle errors
+            errexit("Failed to read: %s\n", strerror(errno));
         }
-         
-        puts("Handler assigned");
+
+        // You need a loop for the write, because not all of the data may be written
+        // in one call; write will return how many bytes were written. p keeps
+        // track of where in the buffer we are, while we decrement bytes_read
+        // to keep track of how many bytes are left to write.
+        void *p = buffer;
+    	printf("Writing back into sock\n");
+
+        while (bytes_read > 0) {
+            int bytes_written = write(sock, p, bytes_read);
+            if (bytes_written <= 0) {
+                // handle errors
+            }
+            bytes_read -= bytes_written;
+            p += bytes_written;
+        }
     }
-     
-    if (client_sock < 0)
-    {
-        perror("accept failed");
-        return 1;
-    }
-    return 0;
+
+	// write(sock, file_loc, strlen(file_loc));
 }
 
 void serverPut(int sock, char * arg)
 {
-    char buf[MAX_BUFFER];
-    char file_loc[128];
-    int file_size, remaining, len;
-    FILE *file;
-    char *auth = "Clear for transfer.";
+	char buf[MAX_BUFFER];
+	char file_loc[128];
+	int file_size, remaining, len;
+	FILE *file;
+	char *auth = "Clear for transfer.";
 
-    sprintf(file_loc, "%s%s/", server_directory, currUser.name);
-    strncat(file_loc, arg, strlen(arg));
-    printf("%s\n", file_loc);
+	sprintf(file_loc, "%s%s/", server_directory, currUser.name);
+	strncat(file_loc, arg, strlen(arg));
+	printf("%s\n", file_loc);
 
-    printf("Sending auth %s\n", file_loc);
+	printf("Sending auth %s\n", file_loc);
 
-    /* Send authentication reply */
-    if (send(sock, auth , strlen(auth), 0) < 0)
-        errexit("Failed to write: %s\n", strerror(errno));
+	/* Send authentication reply */
+	if (send(sock, auth , strlen(auth), 0) < 0)
+		errexit("Failed to write: %s\n", strerror(errno));
 
 
-    int rv;
-    if ((rv = recv(sock, buf, MAX_BUFFER, 0)) < 0) 
-        errexit("Failed to receive file size: %s\n", strerror(errno));
-    file_size = atoi(buf);
-    printf("we made it here1");
+	int rv;
+	if ((rv = recv(sock, buf, MAX_BUFFER, 0)) < 0) 
+		errexit("Failed to receive file size: %s\n", strerror(errno));
+	file_size = atoi(buf);
+	printf("we made it here1");
 
-    if (!(file = fopen(file_loc, "w")))
-        errexit("Failed to open file at: '%s' %s\n", file_loc, strerror(errno)); 
-    printf("we made it here2");
+	if (!(file = fopen(file_loc, "w")))
+		errexit("Failed to open file at: '%s' %s\n", file_loc, strerror(errno)); 
+	printf("we made it here2");
 
-    remaining = file_size;
-    printf("we made it here3");
-    while (((len = recv(sock, buf, MAX_BUFFER, 0)) > 0) && (remaining > 0)) {
-        fwrite(buf, sizeof(char), len, file);
-        remaining -= len;
-        fprintf(stdout, "Received %d bytes\n", len);
-    }
+	remaining = file_size;
+	printf("we made it here3");
+	while (((len = recv(sock, buf, MAX_BUFFER, 0)) > 0) && (remaining > 0)) {
+		fwrite(buf, sizeof(char), len, file);
+		remaining -= len;
+		fprintf(stdout, "Received %d bytes\n", len);
+	}
 
-    fclose(file);
+	fclose(file);
 }
 
 void serverList(int sock, char * username){
-    printf("Getting Files for: %s\n", username);
+	printf("Getting Files for: %s\n", username);
 
-    DIR * d;
-    struct dirent *dir;
-    struct stat filedets;
-    int status;
-    int i = 0;
+	DIR * d;
+	struct dirent *dir;
+	struct stat filedets;
+	int status;
+	int i = 0;
 
-    // char tempresult[128];
-    char result[256];
+	// char tempresult[128];
+	char result[256];
 
-    char path[MAX_BUFFER];
-    char directory[4096];
+	char path[MAX_BUFFER];
+	char directory[4096];
 
-    strcpy(directory, server_directory);
-    strcat(directory, username);
+	strcpy(directory, server_directory);
+	strcat(directory, username);
 
-    d = opendir(directory);
-    int length = 0;
+	d = opendir(directory);
+	int length = 0;
 
-    if (d) {
-        while ((dir = readdir(d)) != NULL) {
-            if (strcmp(".", dir->d_name) == 0){
-            } else if (strcmp("..", dir->d_name) == 0){
-            } else {
-                sprintf(path, "%s/%s", directory, dir->d_name);
-                status = lstat(path, &filedets);
-                if(S_ISDIR(filedets.st_mode)) {
-                } else {
-                    printf("%s\n", dir->d_name);
-                    if(strncmp(dir->d_name, ".DS_Store", 9) != 0)
-                    {
-                        length += sprintf(result + length, "%d. %s\n", i, dir->d_name);
+	if (d) {
+		while ((dir = readdir(d)) != NULL) {
+			if (strcmp(".", dir->d_name) == 0){
+			} else if (strcmp("..", dir->d_name) == 0){
+			} else {
+				sprintf(path, "%s/%s", directory, dir->d_name);
+				status = lstat(path, &filedets);
+				if(S_ISDIR(filedets.st_mode)) {
+				} else {
+					printf("%s\n", dir->d_name);
+					if(strncmp(dir->d_name, ".DS_Store", 9) != 0)
+					{
+						length += sprintf(result + length, "%d. %s\n", i, dir->d_name);
 
-                        // checkFileCurrServ(sock, dir->d_name);
-                        //TODO: Check for Pieces on Other Servers
-                        i++;
-                        // continue;
-                    }
-                }
-            }
-        }
-        puts(result);
-        write(sock, result, strlen(result));
-        closedir(d);
-    } 
+						// checkFileCurrServ(sock, dir->d_name);
+						//TODO: Check for Pieces on Other Servers
+						i++;
+						// continue;
+					}
+				}
+			}
+		}
+		puts(result);
+		write(sock, result, strlen(result));
+		closedir(d);
+	} 
 }
 
 // //Check the Current Server for the File
@@ -383,7 +426,7 @@ void serverList(int sock, char * username){
 // void checkFileCurrServ(int sock, char * filename){
 
 //     // printf("File: %s\n", filename);
-    
+	
 //     char ext[8] = "";
 //     char filenopart[256] = "";
 //     char currpart[256] = "";
@@ -413,7 +456,7 @@ void serverList(int sock, char * username){
 
 //     strcpy(currpart, filenopart);
 //     strcat(currpart, ".1");
-    
+	
 //     strcat(path, currpart);
 
 //     // printf("Path: %s FD: %d\n", path, access( path, F_OK ));
@@ -434,7 +477,7 @@ void serverList(int sock, char * username){
 
 //     strcpy(currpart, filenopart);
 //     strcat(currpart, ".2");
-    
+	
 //     strcat(path, currpart);
 
 //     if ((fd = open(path, O_RDONLY)) != -1){
@@ -453,7 +496,7 @@ void serverList(int sock, char * username){
 
 //     strcpy(currpart, filenopart);
 //     strcat(currpart, ".3");
-    
+	
 //     strcat(path, currpart);
 
 //     if ((fd = open(path, O_RDONLY) != -1)){
@@ -473,7 +516,7 @@ void serverList(int sock, char * username){
 
 //     strcpy(currpart, filenopart);
 //     strcat(currpart, ".4");
-    
+	
 //     strcat(path, currpart);
 
 //     if ((fd = open(path, O_RDONLY) != -1)){
@@ -527,7 +570,7 @@ void serverList(int sock, char * username){
 //             // printf("Trying to connect to server: %d\n", currport);
 
 //             servfd = connectSocket(currport, "localhost");
-            
+			
 //             //TODO 1 sec timeout
 
 //             write(servfd, command, strlen(command));
@@ -559,12 +602,12 @@ void serverList(int sock, char * username){
 // }
 
 int errexit(const char *format, ...) {
-        va_list args;
+		va_list args;
 
-        va_start(args, format);
-        vfprintf(stderr, format, args);
-        va_end(args);
-        exit(1);
+		va_start(args, format);
+		vfprintf(stderr, format, args);
+		va_end(args);
+		exit(1);
 }
 
 int main(int argc, char *argv[], char **envp)
@@ -576,18 +619,18 @@ int main(int argc, char *argv[], char **envp)
 	}
 
 	// create a folder which will hold the contents of the server
-    strcat(server_directory, argv[1]);
-    strcat(server_directory, "/");
-    if(!opendir(server_directory))
-    {
-    	mkdir(server_directory, 0770);    	
-    }
+	strcat(server_directory, argv[1]);
+	strcat(server_directory, "/");
+	if(!opendir(server_directory))
+	{
+		mkdir(server_directory, 0770);    	
+	}
 
-    server_port = atoi(argv[2]);
+	server_port = atoi(argv[2]);
 
-    parseConfFile("server/dfs.conf");
+	parseConfFile("server/dfs.conf");
 
-    listenOnPort(server_port);
+	listenOnPort(server_port);
 
-    return 1;
+	return 1;
 }
