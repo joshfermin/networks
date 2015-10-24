@@ -136,7 +136,7 @@ void authenticateUser(int sock, char * username, char * password)
     strcat(result, username);
     strcat(result, " ");
     strcat(result, password);
-    if(!(write(sock, result, strlen(result)) < 0)
+    if(!(write(sock, result, strlen(result)) < 0))
     {
         puts("Authentication failed");
     }
