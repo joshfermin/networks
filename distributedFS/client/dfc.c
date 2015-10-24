@@ -108,15 +108,7 @@ void readUserInput(int sock) {
             // printf("the command you entered was: %s\n", command);
             // printf("sock num %d\n", sock);
             list(sock, command);
-            // if( recv(sock , server_reply , 2000 , 0) < 0)
-            // {
-            //     errexit("Error in recv: %s\n", strerror(errno));
-            //     // puts("recv failed");
-            //     break;
-            // }
-            // // server_reply[len] = '\0';
-            // puts("Server reply :");
-            // puts(server_reply);
+            
         }
         else if (!strncasecmp(command, "GET", 3)) {
             get(sock, command);
@@ -134,6 +126,15 @@ void readUserInput(int sock) {
             printf("Invalid command. Type \"HELP\" for more options.\n");
         }
 
+        if( recv(sock, server_reply, 2000, 0) < 0)
+        {
+            errexit("Error in recv: %s\n", strerror(errno));
+            // puts("recv failed");
+            break;
+        }
+        // server_reply[len] = '\0';
+        puts("Server reply :");
+        puts(server_reply);
     }
     printf("Shutting down...\n");
 }
@@ -154,7 +155,7 @@ void authenticateUser(int sock, char * username, char * password)
 
 void list(int sock, char * command)
 {
-    if(send(sock, command, strlen(command), 0) < 0) {
+    if(write(sock, command, strlen(command)) < 0) {
         // puts("List failed");
         errexit("Error in List: %s\n", strerror(errno));
 
@@ -198,7 +199,7 @@ int connectSocket(int port, const char *hostname)
         return 1;
     }
 
-    // authenticateUser(sock, username, password);
+    authenticateUser(sock, username, password);
 
     printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
 

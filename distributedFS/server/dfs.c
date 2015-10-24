@@ -27,8 +27,6 @@ user currUser;
 char server_directory[256] = ".";
 int server_port;
 int num_users = 0;
-char username[256];
-char passwd[256];
 
 
 void parseConfFile(const char *);
@@ -86,67 +84,64 @@ int countLines(const char *filename)
 
 void processRequest(int socket)
 {
-    char    buf[MAX_BUFFER];
-    char    command[8], arg[64];
-    char    *token;
-    char    username[32], passwd[32];
-    int     read_size    = 0;
-    int     len = 0;
+    char buf[MAX_BUFFER];
+    char arg[64];
+    char *token;
+    char username[32], passwd[32];
+    int read_size    = 0;
+    int len = 0;
 
     while ((read_size = recv(socket, &buf[len], (MAX_BUFFER-len), 0)) > 0)
     { 
-        char    current[read_size];
-        /* Retrive the last line sent */
-        strncpy(current, &buf[len], sizeof(current));
+        char command[read_size];
+        strncpy(command, &buf[len], sizeof(command));
         len += read_size;
-        /* Zero end of array */
-        current[read_size] = '\0';
+        command[read_size] = '\0';
 
-        printf("Found:  %s\n", current);
+        printf("Found:  %s\n", command);
 
         // printf("Line: %s\n", command);
         if (strncmp(command, "LOGIN:", 6) == 0)
         {
         	token = strtok(command, ": ");
 	        token = strtok(NULL, " ");
-	        if (token == NULL){
-	            write(socket, "Invalid Command Format. Please try again.\n", 42);
-	            close(socket);
-	            return;
-	        }
+            if (token == NULL){
+                write(socket, "Invalid Command Format. Please try again.\n", 42);
+                close(socket);
+                return;
+            }
 	        strcpy(username, token);
-
+            if (token == NULL){
+                write(socket, "Invalid Command Format. Please try again.\n", 42);
+                close(socket);
+                return;
+            }
 	        token = strtok(NULL, " ");
-	        if (token == NULL){
-	            write(socket, "Invalid Command Format. Please try again.\n", 42);
-	            close(socket);
-	            return;
-	        }
 	        strcpy(passwd, token);
-            //Check Username and Password
-	        if (authenticateUser(socket, username, passwd) == 0){
-	        	char *message = "Invalid Username/Password. Please try again.\n";
-	            write(socket, message, strlen(message));
-	            close(socket);
-	            return;
-	        }
+
     	}
 
-        sscanf(current, "%s %s", command, arg);
+        sscanf(command, "%s %s", command, arg);
         // Check Command
         if (strncmp(command, "GET", 3) == 0) {
             printf("GET CALLED!\n");
             // getFile(command, connection);
         } else if(strncmp(command, "LIST", 4) == 0) {
             printf("LIST CALLED:\n");
-        	write(socket, command , strlen(command));
+        	send(socket, command , strlen(command), 0);
             // server_list(username);
         } else if(strncmp(command, "PUT", 3) == 0){
             //Put Call
             printf("PUT Called!\n");
 
         } else if(strncmp(command, "LOGIN", 4) == 0) {
-
+                        //Check Username and Password
+            if (authenticateUser(socket, username, passwd) == 0){
+                char *message = "Invalid Username/Password. Please try again.\n";
+                write(socket, message, strlen(message));
+                close(socket);
+                return;
+            }
         } else {
             printf("Unsupported Command: %s\n", command);
         }
@@ -171,19 +166,16 @@ int authenticateUser(int socket, char * username, char * password)
 
     strcpy(directory, server_directory);
     strcat(directory, username);
-	printf("curName: %s curPass: %s\n", username, password );
     for (i = 0; i < num_users; i++){
-    	printf("Name: %s Pass: %s\n", users[i].name, users[i].password);
         if (strncmp(users[i].name, username, strlen(username)) == 0){
         	if(strncmp(users[i].password, password, strlen(password)) == 0)
         	{
-        		printf("we mad it bois");
 	            currUser = users[i];
 	            if(!opendir(directory)) {
 	                write(socket, "Directory Doesn't Exist. Creating!\n", 35);
 	                mkdir(directory, 0770);
 	            }
-	            printf("user authenticated");
+	            printf("User Authenticated.\n");
 	            return 1;
         	}
         }
