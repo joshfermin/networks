@@ -328,6 +328,7 @@ void serverPut(int sock, char * arg)
 
     fclose(file);
 }
+
 void serverList(int sock, char * username){
     printf("Getting Files for: %s\n", username);
 
@@ -337,7 +338,7 @@ void serverList(int sock, char * username){
     int status;
     int i = 0;
 
-    char tempresult[128];
+    // char tempresult[128];
     char result[256];
 
     char path[MAX_BUFFER];
@@ -347,25 +348,27 @@ void serverList(int sock, char * username){
     strcat(directory, username);
 
     d = opendir(directory);
+    int length = 0;
 
     if (d) {
         while ((dir = readdir(d)) != NULL) {
             if (strcmp(".", dir->d_name) == 0){
-                //Skip Current Dir
             } else if (strcmp("..", dir->d_name) == 0){
-                //Skip Prev Dir
             } else {
                 sprintf(path, "%s/%s", directory, dir->d_name);
-                // puts(path);
                 status = lstat(path, &filedets);
                 if(S_ISDIR(filedets.st_mode)) {
-                    //Skip Directories
                 } else {
-                    sprintf(tempresult, "%d. %s\n", i, dir->d_name);
-                    strcat(result, tempresult);
-                    // checkFileCurrServ(sock, dir->d_name);
-                    //TODO: Check for Pieces on Other Servers
-                    i++;
+                    printf("%s\n", dir->d_name);
+                    if(strncmp(dir->d_name, ".DS_Store", 9) != 0)
+                    {
+                        length += sprintf(result + length, "%d. %s\n", i, dir->d_name);
+
+                        // checkFileCurrServ(sock, dir->d_name);
+                        //TODO: Check for Pieces on Other Servers
+                        i++;
+                        // continue;
+                    }
                 }
             }
         }
