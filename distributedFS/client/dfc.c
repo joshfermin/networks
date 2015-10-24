@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <stdarg.h>
 // #include <stdbool.h>
 
 #include "configdfc.h"
@@ -32,6 +33,7 @@ void list(int, char *);
 int put(int, char *);
 int get(int, char *);
 void authenticateUser(int, char *, char *);
+int errexit(const char *format, ...);
 
 char username[128];
 char password[128];
@@ -82,6 +84,8 @@ int parseConfFile(const char *filename)
     return i;
 }
 
+
+
 // Reads user input to get LIST, PUT, GET, QUIT, HELP commands
 void readUserInput(int sock) {
     char *line = NULL;      /* Line read from STDIN */
@@ -89,6 +93,7 @@ void readUserInput(int sock) {
     ssize_t read;
     char command[8], arg[64];
     int status = 1;
+    // int server_reply_len = 0;
     char server_reply[MAX_BUFFER];
 
 
@@ -101,7 +106,17 @@ void readUserInput(int sock) {
 
         if (!strncasecmp(command, "LIST", 4)) {
             // printf("the command you entered was: %s\n", command);
+            // printf("sock num %d\n", sock);
             list(sock, command);
+            // if( recv(sock , server_reply , 2000 , 0) < 0)
+            // {
+            //     errexit("Error in recv: %s\n", strerror(errno));
+            //     // puts("recv failed");
+            //     break;
+            // }
+            // // server_reply[len] = '\0';
+            // puts("Server reply :");
+            // puts(server_reply);
         }
         else if (!strncasecmp(command, "GET", 3)) {
             get(sock, command);
@@ -119,12 +134,6 @@ void readUserInput(int sock) {
             printf("Invalid command. Type \"HELP\" for more options.\n");
         }
 
-        if( recv(sock, server_reply , 2000 , 0) < 0) {
-            puts("recv failed");
-            break;
-        }
-        puts("Server reply :");
-        puts(server_reply);
     }
     printf("Shutting down...\n");
 }
@@ -136,21 +145,19 @@ void authenticateUser(int sock, char * username, char * password)
     strcat(result, username);
     strcat(result, " ");
     strcat(result, password);
-    if(!(write(sock, result, strlen(result)) < 0))
-    {
-        puts("Authentication failed");
+    if (write(sock, result, strlen(result)) < 0){
+        // puts("Authentication failed");
+        errexit("Error in Authentication: %s\n", strerror(errno));
+
     }
-    // return true;
 }
 
 void list(int sock, char * command)
 {
-    if(!(write(sock, command, strlen(command)) < 0))
-    {
-        // puts("Send LIST");
-        // return 1;
-    } else {
-        puts("Send failed");
+    if(send(sock, command, strlen(command), 0) < 0) {
+        // puts("List failed");
+        errexit("Error in List: %s\n", strerror(errno));
+
     }
 }
 
@@ -173,13 +180,13 @@ int connectSocket(int port, const char *hostname)
     struct sockaddr_in server;
      
     //Create socket
-    sock = socket(AF_INET , SOCK_STREAM , 0);
+    sock = socket(AF_INET , SOCK_STREAM , IPPROTO_TCP);
     if (sock == -1)
     {
         printf("Could not create socket");
     }
     // puts("Socket created");
-     
+     printf("port num %d\n", port);
     server.sin_addr.s_addr = inet_addr(hostname);
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
@@ -191,12 +198,21 @@ int connectSocket(int port, const char *hostname)
         return 1;
     }
 
-    authenticateUser(sock, username, password);
+    // authenticateUser(sock, username, password);
 
     printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
+
     return sock;
 }
 
+int errexit(const char *format, ...) {
+        va_list args;
+
+        va_start(args, format);
+        vfprintf(stderr, format, args);
+        va_end(args);
+        exit(1);
+}
 
 int main(int argc, char *argv[], char **envp)
 {
@@ -222,8 +238,9 @@ int main(int argc, char *argv[], char **envp)
         // Try to connect to one of the servers
         for (i = 0; i < num_servers; i++)
         {
-            if(servers[i].fd)
+            if(servers[i].fd != 1)
             {
+                printf("%d\n", servers[i].fd);
                 readUserInput(servers[i].fd);
                 // connection found, break out of loop.
                 break;

@@ -86,15 +86,25 @@ int countLines(const char *filename)
 
 void processRequest(int socket)
 {
-    char command[MAX_BUFFER]; 
-    char * token;
-    int read_size;
+    char    buf[MAX_BUFFER];
+    char    command[8], arg[64];
+    char    *token;
+    char    username[32], passwd[32];
+    int     read_size    = 0;
+    int     len = 0;
 
-    // printf("im here in processRequest");
-
-    while((read_size = recv(socket, command, MAX_BUFFER, 0)) > 0 )
+    while ((read_size = recv(socket, &buf[len], (MAX_BUFFER-len), 0)) > 0)
     { 
-        printf("Line: %s\n", command);
+        char    current[read_size];
+        /* Retrive the last line sent */
+        strncpy(current, &buf[len], sizeof(current));
+        len += read_size;
+        /* Zero end of array */
+        current[read_size] = '\0';
+
+        printf("Found:  %s\n", current);
+
+        // printf("Line: %s\n", command);
         if (strncmp(command, "LOGIN:", 6) == 0)
         {
         	token = strtok(command, ": ");
@@ -122,7 +132,7 @@ void processRequest(int socket)
 	        }
     	}
 
-
+        sscanf(current, "%s %s", command, arg);
         // Check Command
         if (strncmp(command, "GET", 3) == 0) {
             printf("GET CALLED!\n");
@@ -260,8 +270,7 @@ int main(int argc, char *argv[], char **envp)
 
     parseConfFile("server/dfs.conf");
 
-    int sock;
-    sock = listenOnPort(server_port);
+    listenOnPort(server_port);
 
     return 1;
 }
