@@ -21,4 +21,4 @@ pkill -f dfc
 # fi
 
 ./dfs "/DFS1" "10002"
-// ./dfs "/DFS1" "10003" &
+#./dfs "/DFS1" "10003" &

@@ -283,6 +283,7 @@ int connectSocket(int port, const char *hostname)
     return sock;
 }
 
+
 int errexit(const char *format, ...) {
         va_list args;
 

@@ -45,6 +45,8 @@ void checkFileCurrServ(int, char * filename);
 int requestFileCheck(char * filename);
 int errexit(const char *format, ...);
 void processRequest(int socket);
+int readline(int fd, char * buf, int maxlen);
+
 
 void parseConfFile(const char *filename)
 {
@@ -143,8 +145,8 @@ void processRequest(int socket)
             // getFile(command, connection);
         } else if(strncmp(command, "LIST", 4) == 0) {
             printf("LIST CALLED:\n");
-        	send(socket, command , strlen(command), 0);
-            // serverList(socket, username);
+        	// send(socket, command , strlen(command), 0);
+            serverList(socket, username);
         } else if(strncmp(command, "PUT", 3) == 0){
             //Put Call
             printf("PUT Called!\n");
@@ -199,7 +201,37 @@ int authenticateUser(int socket, char * username, char * password)
 }
 
 
+// Connect to a certain socket
+int connectSocket(int port, const char *hostname)
+{
+    int sock;
+    struct sockaddr_in server;
+     
+    //Create socket
+    sock = socket(AF_INET , SOCK_STREAM , IPPROTO_TCP);
+    if (sock == -1)
+    {
+        printf("Could not create socket");
+    }
+    // puts("Socket created");
+     printf("port num %d\n", port);
+    server.sin_addr.s_addr = inet_addr(hostname);
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+ 
+    //Connect to remote server
+    if (connect(sock, (struct sockaddr *)&server , sizeof(server)) < 0)
+    {
+        perror("connect failed. Error");
+        return 1;
+    }
 
+    // authenticateUser(sock, username, password);
+
+    printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
+
+    return sock;
+}
 
 int listenOnPort(int port) 
 {
@@ -234,7 +266,7 @@ int listenOnPort(int port)
     //Accept and incoming connection
     puts("Waiting for incoming connections...");
     c = sizeof(struct sockaddr_in);
-    while( (client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)) )
+    while((client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)))
     {
         puts("Connection accepted");
         new_sock = malloc(1);
@@ -296,44 +328,52 @@ void serverPut(int sock, char * arg)
 
     fclose(file);
 }
-// void serverList(int sock, char * username){
-//     printf("Getting Files for: %s\n", username);
+void serverList(int sock, char * username){
+    printf("Getting Files for: %s\n", username);
 
-//     DIR * d;
-//     struct dirent *dir;
-//     struct stat filedets;
-//     int status;
+    DIR * d;
+    struct dirent *dir;
+    struct stat filedets;
+    int status;
+    int i = 0;
 
-//     char path[MAX_BUFFER];
-//     char directory[4096];
+    char tempresult[128];
+    char result[256];
 
-//     strcpy(directory, server_directory);
-//     strcat(directory, username);
+    char path[MAX_BUFFER];
+    char directory[4096];
 
-//     d = opendir(directory);
+    strcpy(directory, server_directory);
+    strcat(directory, username);
 
-//     if (d) {
-//         while ((dir = readdir(d)) != NULL) {
-//             if (strcmp(".", dir->d_name) == 0){
-//                 //Skip Current Dir
-//             } else if (strcmp("..", dir->d_name) == 0){
-//                 //Skip Prev Dir
-//             } else {
-//                 sprintf(path, "%s/%s", directory, dir->d_name);
-//                 status = lstat(path, &filedets);
-//                 if(S_ISDIR(filedets.st_mode)) {
-//                     //Skip Directories
-//                 } else {
-//                     printf("%s\n", dir->d_name);
-//                     checkFileCurrServ(sock, dir->d_name);
-//                     //TODO: Check for Pieces on Other Servers
-//                 }
-//             }
-//         }
+    d = opendir(directory);
 
-//         closedir(d);
-//     } 
-// }
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if (strcmp(".", dir->d_name) == 0){
+                //Skip Current Dir
+            } else if (strcmp("..", dir->d_name) == 0){
+                //Skip Prev Dir
+            } else {
+                sprintf(path, "%s/%s", directory, dir->d_name);
+                // puts(path);
+                status = lstat(path, &filedets);
+                if(S_ISDIR(filedets.st_mode)) {
+                    //Skip Directories
+                } else {
+                    sprintf(tempresult, "%d. %s\n", i, dir->d_name);
+                    strcat(result, tempresult);
+                    // checkFileCurrServ(sock, dir->d_name);
+                    //TODO: Check for Pieces on Other Servers
+                    i++;
+                }
+            }
+        }
+        puts(result);
+        write(sock, result, strlen(result));
+        closedir(d);
+    } 
+}
 
 // //Check the Current Server for the File
 // //Request Check on other Server if not found
@@ -483,7 +523,7 @@ void serverPut(int sock, char * arg)
 //             //Connect to Other Server
 //             // printf("Trying to connect to server: %d\n", currport);
 
-//             servfd = open_clientfd("localhost", currport);
+//             servfd = connectSocket(currport, "localhost");
             
 //             //TODO 1 sec timeout
 
@@ -501,6 +541,18 @@ void serverPut(int sock, char * arg)
 //     }
 
 //     return 0;
+// }
+// int readline(int fd, char * buf, int maxlen)
+// {
+//     int nc, n = 0;
+//     for(n=0; n < maxlen-1; n++)
+//     {
+//         nc = read(fd, &buf[n], 1);
+//         if( nc <= 0) return nc;
+//         if(buf[n] == '\n') break;
+//     }
+//     buf[n+1] = 0;
+//     return n+1;
 // }
 
 int errexit(const char *format, ...) {
