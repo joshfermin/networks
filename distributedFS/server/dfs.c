@@ -136,24 +136,18 @@ void processRequest(int socket)
 		}
 
 		sscanf(line, "%s %s", command, arg);
-		// printf("%s\n", command);
-		// printf("%s\n", arg);
 
-		// Check Command
 		if (strncmp(command, "GET", 3) == 0) {
 			printf("GET CALLED!\n");
 			serverGet(socket, arg);
-			// getFile(command, connection);
 		} else if(strncmp(command, "LIST", 4) == 0) {
 			printf("LIST CALLED:\n");
 			// send(socket, command , strlen(command), 0);
 			serverList(socket, username);
 		} else if(strncmp(command, "PUT", 3) == 0){
-			//Put Call
 			printf("PUT Called!\n");
 			serverPut(socket, arg);
-		} else if(strncmp(command, "LOGIN", 4) == 0) {
-						//Check Username and Password
+		} else if(strncmp(command, "LOGIN", 5) == 0) {
 			if (authenticateUser(socket, username, passwd) == 0){
 				char *message = "Invalid Username/Password. Please try again.\n";
 				write(socket, message, strlen(message));
@@ -330,44 +324,59 @@ void serverGet(int sock, char * filename)
     }
 }
 
+
+
 void serverPut(int sock, char * arg)
 {
 	char buf[MAX_BUFFER];
-	char file_loc[128];
-	int file_size, remaining, len;
+	char file_path[128];
+	int file_size, remaining, len = 0;
+	int len2;
 	FILE *file;
-	char *auth = "Clear for transfer.";
+	// int len = 0;
+	// char *auth = "Clear for transfer.";
 
-	sprintf(file_loc, "%s%s/", server_directory, currUser.name);
-	strncat(file_loc, arg, strlen(arg));
-	printf("%s\n", file_loc);
+	sprintf(file_path, "%s%s/", server_directory, currUser.name);
+	strncat(file_path, arg, strlen(arg));
+	printf("%s\n", file_path);
 
-	printf("Sending auth %s\n", file_loc);
+	// if (send(sock, file_path , strlen(file_path), 0) < 0)
+		// errexit("Failed to write: %s\n", strerror(errno));
+	printf("we made it here0");
 
-	/* Send authentication reply */
-	if (send(sock, auth , strlen(auth), 0) < 0)
-		errexit("Failed to write: %s\n", strerror(errno));
+	int read_size;
+	while((read_size = recv(sock, &buf[len], (MAX_BUFFER-len), 0)) > 0)
+	{
+		char line[read_size];
+		strncpy(line, &buf[len], sizeof(line));
+		len += read_size;
+		line[read_size] = '\0';
+		printf("Buf is %s\n", buf);
+		// puts(buf);
+		file_size = atoi(buf);
+		printf("%d\n", file_size);
+		if (!(file = fopen(file_path, "w")))
+			errexit("Failed to open file at: '%s' %s\n", file_path, strerror(errno)); 
+		puts("we made it here2");
 
+		remaining = file_size;
+		puts("we made it here3");
+		while (((len2 = recv(sock, buf, MAX_BUFFER, 0)) > 0) && (remaining > 0)) {
+			printf("%s\n", buf);
 
-	int rv;
-	if ((rv = recv(sock, buf, MAX_BUFFER, 0)) < 0) 
-		errexit("Failed to receive file size: %s\n", strerror(errno));
-	file_size = atoi(buf);
-	printf("we made it here1");
+			// write to file
+			fprintf(file, "%s\n", buf);
+        	fclose(file);
 
-	if (!(file = fopen(file_loc, "w")))
-		errexit("Failed to open file at: '%s' %s\n", file_loc, strerror(errno)); 
-	printf("we made it here2");
+			fwrite(buf, sizeof(char), len, file);
+			remaining -= len;
 
-	remaining = file_size;
-	printf("we made it here3");
-	while (((len = recv(sock, buf, MAX_BUFFER, 0)) > 0) && (remaining > 0)) {
-		fwrite(buf, sizeof(char), len, file);
-		remaining -= len;
-		fprintf(stdout, "Received %d bytes\n", len);
+			// fprintf(stdout, "Received %d bytes\n", len);
+			return;
+		}
 	}
 
-	fclose(file);
+	// fclose(file);
 }
 
 void serverList(int sock, char * username){

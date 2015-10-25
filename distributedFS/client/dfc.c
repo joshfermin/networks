@@ -102,12 +102,11 @@ void readUserInput(int sock) {
         line[read-1] = '\0';
 
         sscanf(line, "%s %s", command, arg);
-        // printf("%lu\n", strlen(line));
+
         if (!strncasecmp(command, "LIST", 4)) {
             // printf("the command you entered was: %s\n", command);
             // printf("sock num %d\n", sock);
             list(sock, command);
-            
         }
         else if (!strncasecmp(command, "GET", 3)) {
             if (strlen(line) <= 3)
@@ -142,7 +141,6 @@ void recieveReplyFromServer(int sock){
         // puts("recv failed");
     } else {
         // server_reply[len] = '\0'; // null terminate server_reply
-        puts("Server reply :");
         puts(server_reply);
     }
 }
@@ -167,7 +165,6 @@ void list(int sock, char *command)
         // puts("List failed");
         errexit("Error in List: %s\n", strerror(errno));
     }
-
     recieveReplyFromServer(sock);
 }
 
@@ -181,11 +178,14 @@ int put(int sock, char *line)
 
     char file_loc[128];
     int fd;
+    char file_size[256];
+    int size;
     struct stat file_stat;
     char command[8], arg[64];
     char buffer[MAX_BUFFER];
-    char file_size[256];        /* Amount of bytes to take from file */
+    // int remaining = va_arg(args, off_t);
     char server_reply[MAX_BUFFER];
+
 
 
     sscanf(line, "%s %s", command, arg);
@@ -202,41 +202,46 @@ int put(int sock, char *line)
     if (fstat(fd, &file_stat) < 0)
         errexit("Error fstat file at: '%s' %s\n", file_loc, strerror(errno));
 
-    // nanosleep(&tim, NULL);
-    // printf("here we go");
+    size = file_stat.st_size;
+    sprintf(file_size, "%d", size);
+    // printf("%s\n", file_size);
+
+    // nanosleep(&tim, NULL); 
     
-    if(recv(sock, server_reply, 2000, 0) < 0)
-    {
-        puts(server_reply);
-        if (write(sock, file_stat.st_size, sizeof(file_stat.st_size)) < 0)
-            errexit("Echo write: %s\n", strerror(errno));
+    // if(recv(sock, server_reply, 2000, 0) < 0)
+        // errexit("Error in recv: %s\n", strerror(errno));
+        // puts("recv failed");
+    // printf("%s\n",server_reply);
 
-        // nanosleep(&tim, NULL); 
 
-        while (1) {
-            // Read data into buffer.  We may not have enough to fill up buffer, so we
-            // store how many bytes were actually read in bytes_read.
-            int bytes_read = read(fd, buffer, sizeof(buffer));
-            if (bytes_read == 0) // We're done reading from the file
-                break;
+    if (write(sock, file_size, sizeof(file_size)) < 0)
+        errexit("Echo write: %s\n", strerror(errno));
 
-            if (bytes_read < 0) {
+    // nanosleep(&tim, NULL); 
+
+    while (1) {
+        // Read data into buffer.  We may not have enough to fill up buffer, so we
+        // store how many bytes were actually read in bytes_read.
+        int bytes_read = read(fd, buffer, sizeof(buffer));
+        if (bytes_read == 0) // We're done reading from the file
+            break;
+
+        if (bytes_read < 0) {
+            // handle errors
+        }
+
+        // You need a loop for the write, because not all of the data may be written
+        // in one call; write will return how many bytes were written. p keeps
+        // track of where in the buffer we are, while we decrement bytes_read
+        // to keep track of how many bytes are left to write.
+        void *p = buffer;
+        while (bytes_read > 0) {
+            int bytes_written = write(sock, p, bytes_read);
+            if (bytes_written <= 0) {
                 // handle errors
             }
-
-            // You need a loop for the write, because not all of the data may be written
-            // in one call; write will return how many bytes were written. p keeps
-            // track of where in the buffer we are, while we decrement bytes_read
-            // to keep track of how many bytes are left to write.
-            void *p = buffer;
-            while (bytes_read > 0) {
-                int bytes_written = write(sock, p, bytes_read);
-                if (bytes_written <= 0) {
-                    // handle errors
-                }
-                bytes_read -= bytes_written;
-                p += bytes_written;
-            }
+            bytes_read -= bytes_written;
+            p += bytes_written;
         }
     }
     return 0;   
