@@ -22,7 +22,7 @@
 #include <stdarg.h>
 #include <fcntl.h> // for open
 #include <unistd.h> // for close
-#include <openssl/md5.h> // for md5
+
 
 #include "configdfs.h"
 #define MAX_BUFFER 2000
@@ -140,7 +140,7 @@ void processRequest(int socket)
 				close(socket);
 				return;
 			}
-			char * auth = "SERVER REPLY: User Authenticated.\n";
+			char *auth = "SERVER REPLY: User Authenticated.\n";
 			write(socket, auth, strlen(auth));
 		}
 
@@ -192,7 +192,7 @@ int authenticateUser(int socket, char * username, char * password)
 					write(socket, "Directory Doesn't Exist. Creating!\n", 35);
 					mkdir(directory, 0770);
 				}
-				printf("User Authenticated.\n");
+				// printf("User Authenticated.\n");
 				return 1;
 			}
 		}
@@ -338,16 +338,12 @@ void serverPut(int sock, char * arg)
 	int file_size, remaining, len = 0;
 	int len2;
 	FILE *file;
-	// int len = 0;
-	// char *auth = "Clear for transfer.";
 
 	sprintf(file_path, "%s%s/", server_directory, currUser.name);
 	strncat(file_path, arg, strlen(arg));
 	printf("%s\n", file_path);
 
-	// if (send(sock, file_path , strlen(file_path), 0) < 0)
-		// errexit("Failed to write: %s\n", strerror(errno));
-	printf("we made it here0");
+	// printf("we made it here0");
 
 	int read_size;
 	while((read_size = recv(sock, &buf[len], (MAX_BUFFER-len), 0)) > 0)
@@ -356,16 +352,14 @@ void serverPut(int sock, char * arg)
 		strncpy(line, &buf[len], sizeof(line));
 		len += read_size;
 		line[read_size] = '\0';
-		// printf("Buf is %s\n", buf);
-		// puts(buf);
+
 		file_size = atoi(buf);
 		printf("%d\n", file_size);
 		if (!(file = fopen(file_path, "w")))
 			errexit("Failed to open file at: '%s' %s\n", file_path, strerror(errno)); 
-		// puts("we made it here2");
 
 		remaining = file_size;
-		// puts("we made it here3");
+		// printf("%d\n", remaining);
 		while (((len2 = recv(sock, buf, MAX_BUFFER, 0)) > 0) && (remaining > 0)) {
 			printf("%s\n", buf);
 
@@ -374,13 +368,13 @@ void serverPut(int sock, char * arg)
         	fclose(file);
 
 			fwrite(buf, sizeof(char), len, file);
+
 			remaining -= len;
 
 			// fprintf(stdout, "Received %d bytes\n", len);
 			return;
 		}
 	}
-
 	// fclose(file);
 }
 

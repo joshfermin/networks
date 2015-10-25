@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <fcntl.h> //(for O_*)
+#include <openssl/md5.h> // for md5
 
 #include "configdfc.h"
 #define MAX_BUFFER 2000
@@ -149,8 +150,8 @@ void recieveReplyFromServer(int sock){
 void authenticateUser(int sock, char * username, char * password)
 {
     char *result = malloc(strlen(username)+strlen(password));//+1 for the zero-terminator
-    char buf[MAX_BUFFER];
-    int len;
+    // char buf[MAX_BUFFER];
+    // int len;
 
     strcpy(result, "LOGIN:");
     strcat(result, username);
@@ -197,29 +198,37 @@ int attemptToConnect()
 // http://stackoverflow.com/questions/2014033/send-and-receive-a-file-in-socket-programming-in-linux-with-c-c-gcc-g
 int put(char *line)
 {
-    struct timespec tim;
-    tim.tv_sec = 0;
-    tim.tv_nsec = 100000000L; /* 0.1 seconds */
-
     char file_loc[128];
     int fd;
     char file_size[256];
+    char req[128];
     int size;
     struct stat file_stat;
     char command[8], arg[64];
     char buffer[MAX_BUFFER];
-    // int remaining = va_arg(args, off_t);
-    char server_reply[MAX_BUFFER];
-    int sock = attemptToConnect();
+    MD5_CTX mdContext;
+    char md5buf[MAX_BUFFER];
+    // int sock = attemptToConnect();
+    int rv, i, count = num_servers;
+    char byte[64];
+    char sum[MD5_DIGEST_LENGTH];
+    int order;
+    int order_mat[num_servers][2];
 
+    struct timespec tim;
+    tim.tv_sec = 0;
+    tim.tv_nsec = 100000000L; /* 0.1 seconds */
 
     sscanf(line, "%s %s", command, arg);
     sprintf(file_loc, "%s/%s", FILE_DIR, arg);
 
-    if(write(sock, line, strlen(line)) < 0) {
-        // puts("List failed");
-        errexit("Error in List: %s\n", strerror(errno));
+
+    for (i = 0; i < num_servers; ++i)
+    {
+        servers[i].fd = connectSocket(servers[i].port, servers[i].host);
     }
+
+ 
 
     if ((fd = open(file_loc, O_RDONLY)) < 0)
         errexit("Failed to open file at: '%s' %s\n", file_loc, strerror(errno)); 
@@ -229,37 +238,98 @@ int put(char *line)
 
     size = file_stat.st_size;
     sprintf(file_size, "%d", size);
-    
-    if (write(sock, file_size, sizeof(file_size)) < 0)
-        errexit("Echo write: %s\n", strerror(errno));
 
-    // nanosleep(&tim, NULL); 
+    /* Get MD5sum of file to select server order */
+    MD5_Init(&mdContext);
+    while ((rv = read(fd, &md5buf, MAX_BUFFER)) != 0)
+        MD5_Update(&mdContext, md5buf, rv);
+    MD5_Final(sum, &mdContext);
+     // Use modulus on first byte of MD5 hash 
+    sprintf(byte, "%02x", sum[0]);
+    order = (strtol(byte, NULL, 16) % count);
 
-    while (1) {
-        // Read data into buffer.  We may not have enough to fill up buffer, so we
-        // store how many bytes were actually read in bytes_read.
-        int bytes_read = read(fd, buffer, sizeof(buffer));
-        if (bytes_read == 0) // We're done reading from the file
-            break;
+    close(fd);
 
-        if (bytes_read < 0) {
-            // handle errors
+    /* Calculate order matrix
+     * (4 X 2) Piece number X Server number
+     */
+     for (i = 1; i < count + 1; i++) {
+        order_mat[(i % count)][0] = i-1;
+        order_mat[(i % count)][1] = (i % count);
+     }
+    printf("Size: %d Using: %ld\n", size, size / count);
+    sprintf(file_size, "%ld", size / count);
+    printf("%s\n", file_size);
+
+    /* Format new filename */
+    sprintf(req, "PUT %s.", arg);
+    // printf("%s\n", req);
+
+    int offset = 0;
+    char piece_name[128];
+    // printf("%d\n", count);
+    // count = 4;
+    for (i = 0; i < count; i++) {
+
+        sprintf(piece_name, "%s%d", req, i+1);
+        printf("%s\n", piece_name); 
+
+        if (write(servers[order_mat[i][0]].fd, piece_name, strlen(piece_name)) < 0){
+            errexit("Error in List: %s\n", strerror(errno));
+        } 
+
+        // nanosleep(&tim, NULL); 
+
+        nanosleep(&tim, NULL); 
+
+        if(write(servers[order_mat[i][0]].fd, file_size, strlen(file_size)) < 0) {
+            // puts("List failed");
+            errexit("Error in List: %s\n", strerror(errno));
         }
+        // printf("0: %d\n", order_mat[i][0]);
+        // printf("1: %d\n", order_mat[i][1]);
 
-        // You need a loop for the write, because not all of the data may be written
-        // in one call; write will return how many bytes were written. p keeps
-        // track of where in the buffer we are, while we decrement bytes_read
-        // to keep track of how many bytes are left to write.
-        void *p = buffer;
-        while (bytes_read > 0) {
-            int bytes_written = write(sock, p, bytes_read);
-            if (bytes_written <= 0) {
+        nanosleep(&tim, NULL); 
+
+        while (1) {
+            // Read data into buffer.  We may not have enough to fill up buffer, so we
+            // store how many bytes were actually read in bytes_read.
+            int bytes_read = read(fd, buffer, sizeof(buffer));
+            if (bytes_read == 0) // We're done reading from the file
+                break;
+
+            if (bytes_read < 0) {
                 // handle errors
             }
-            bytes_read -= bytes_written;
-            p += bytes_written;
+
+            // You need a loop for the write, because not all of the data may be written
+            // in one call; write will return how many bytes were written. p keeps
+            // track of where in the buffer we are, while we decrement bytes_read
+            // to keep track of how many bytes are left to write.
+            void *p = buffer;
+            while (bytes_read > 0) {
+                int bytes_written = write(servers[order_mat[i][0]].fd, p, bytes_read);
+                if (bytes_written <= 0) {
+                    // handle errors
+                }
+                bytes_read -= bytes_written;
+                p += bytes_written;
+            }
+            // while (bytes_read > 0) {
+            //     int bytes_written = write(servers[i][1], p, bytes_read);
+            //     if (bytes_written <= 0) {
+            //         // handle errors
+            //     }
+            //     bytes_read -= bytes_written;
+            //     p += bytes_written;
+            // }
         }
+        offset += (size/count);
     }
+
+    puts("done with forloop");
+    // if (write(sock, file_size, sizeof(file_size)) < 0)
+    //     errexit("Echo write: %s\n", strerror(errno));
     return 0;  
 }
 
@@ -271,18 +341,7 @@ int get(char *line)
     FILE *downloaded_file;
     char command[8], arg[64];
     char file_loc[128];
-    int sock;
-    int i;
-
-    for (i = 0; i < num_servers; ++i)
-    {
-        servers[i].fd = connectSocket(servers[i].port, servers[i].host);
-        if(servers[i].fd != 1)
-        {
-            sock = servers[i].fd;
-            break; // found connection
-        }
-    }
+    int sock = attemptToConnect();
 
     sscanf(line, "%s %s", command, arg);
     sprintf(file_loc, "./%s", arg);
@@ -362,7 +421,6 @@ int main(int argc, char *argv[], char **envp)
 {
     if(argv[1])
     {
-        int i;
         // int server_fd[64];
 
         // Get the number of servers
@@ -370,27 +428,14 @@ int main(int argc, char *argv[], char **envp)
 
         // Try to connect to the following servers.
         printf("There are %d servers in the config file.\n", num_servers);
-        // printf("Attempting to connect...\n\n");
-        // for (i = 0; i < num_servers; ++i)
-        // {
-        //     servers[i].fd = connectSocket(servers[i].port, servers[i].host);
-        // }
 
-        // Try to connect to one of the servers
-        // for (i = 0; i < num_servers; i++)
-        // {
-        //     if(servers[i].fd != 1)
-        //     {
-                // printf("%d\n", servers[i].fd);
         readUserInput();
-                // connection found, break out of loop.
-        //         break;
-        //     }
-        // }
         return 1;
     }
     else
     {
         printf("Please specify a config file.\n");
     }
+
+
 }
