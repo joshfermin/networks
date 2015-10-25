@@ -239,12 +239,6 @@ int put(int sock, char *line)
             }
         }
     }
-
-    // recieveReplyFromServer(sock);
-    // while (((sent = sendfile(sock, fd, &offset, BUFSIZE)) >= 0) && (remaining > 0)) {
-    //     remaining -= sent;
-    //     printf("%d bytes sent. %d bytes remaining\n", sent, remaining);
-    // }
     return 0;   
 }
 
@@ -253,11 +247,26 @@ int get(int sock, char *line)
     char buf[MAX_BUFFER];
     int read_size    = 0;
     int len = 0;
+    FILE *downloaded_file;
+    char command[8], arg[64];
+    char file_loc[128];
+
+    sscanf(line, "%s %s", command, arg);
+    sprintf(file_loc, "./%s", arg);
 
     if(write(sock, line, strlen(line)) < 0) {
         // puts("List failed");
         errexit("Error in List: %s\n", strerror(errno));
     }
+
+    downloaded_file = fopen(file_loc, "w");
+    if (downloaded_file == NULL)
+    {
+        printf("Error opening file!\n");
+        exit(1);
+    }
+
+
     while ((read_size = recv(sock, &buf[len], (MAX_BUFFER-len), 0)) > 0)
     { 
         char line[read_size];
@@ -265,9 +274,12 @@ int get(int sock, char *line)
         len += read_size;
         line[read_size] = '\0';
 
-        printf("Found:  %s\n", line);
+        printf("%s\n", line);
+        fprintf(downloaded_file, "%s\n", line);
+        fclose(downloaded_file);
         return 1;
     }
+
     return 0;
 }
 

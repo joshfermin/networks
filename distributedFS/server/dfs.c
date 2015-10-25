@@ -328,8 +328,6 @@ void serverGet(int sock, char * filename)
             p += bytes_written;
         }
     }
-
-	// write(sock, file_loc, strlen(file_loc));
 }
 
 void serverPut(int sock, char * arg)
