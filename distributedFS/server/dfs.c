@@ -133,6 +133,15 @@ void processRequest(int socket)
 			}
 			token = strtok(NULL, " ");
 			strcpy(passwd, token);
+
+			if (authenticateUser(socket, username, passwd) == 0){
+				char *message = "Invalid Username/Password. Please try again.\n";
+				write(socket, message, strlen(message));
+				close(socket);
+				return;
+			}
+			char * auth = "SERVER REPLY: User Authenticated.\n";
+			write(socket, auth, strlen(auth));
 		}
 
 		sscanf(line, "%s %s", command, arg);
@@ -148,12 +157,7 @@ void processRequest(int socket)
 			printf("PUT Called!\n");
 			serverPut(socket, arg);
 		} else if(strncmp(command, "LOGIN", 5) == 0) {
-			if (authenticateUser(socket, username, passwd) == 0){
-				char *message = "Invalid Username/Password. Please try again.\n";
-				write(socket, message, strlen(message));
-				close(socket);
-				return;
-			}
+			
 		} else {
 			printf("Unsupported Command: %s\n", command);
 		}
@@ -178,6 +182,7 @@ int authenticateUser(int socket, char * username, char * password)
 
 	strcpy(directory, server_directory);
 	strcat(directory, username);
+	printf("usernameL %s password: %s\n", username, password);
 	for (i = 0; i < num_users; i++){
 		if (strncmp(users[i].name, username, strlen(username)) == 0){
 			if(strncmp(users[i].password, password, strlen(password)) == 0)
@@ -351,16 +356,16 @@ void serverPut(int sock, char * arg)
 		strncpy(line, &buf[len], sizeof(line));
 		len += read_size;
 		line[read_size] = '\0';
-		printf("Buf is %s\n", buf);
+		// printf("Buf is %s\n", buf);
 		// puts(buf);
 		file_size = atoi(buf);
 		printf("%d\n", file_size);
 		if (!(file = fopen(file_path, "w")))
 			errexit("Failed to open file at: '%s' %s\n", file_path, strerror(errno)); 
-		puts("we made it here2");
+		// puts("we made it here2");
 
 		remaining = file_size;
-		puts("we made it here3");
+		// puts("we made it here3");
 		while (((len2 = recv(sock, buf, MAX_BUFFER, 0)) > 0) && (remaining > 0)) {
 			printf("%s\n", buf);
 

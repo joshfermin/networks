@@ -21,25 +21,26 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <fcntl.h> //(for O_*)
-// #include <stdbool.h>
 
 #include "configdfc.h"
 #define MAX_BUFFER 2000
 
 int parseConfFile(const char *);
-void readUserInput(int);
+void readUserInput();
 int connectSocket(int, const char *);
-void list(int, char *);
-int put(int, char *);
-int get(int, char *);
+void list(char *);
+int put(char *);
+int get(char *);
 void authenticateUser(int, char *, char *);
 int errexit(const char *format, ...);
 void recieveReplyFromServer(int sock);
+int attemptToConnect();
 
 const char *FILE_DIR="./files";
 char username[128];
 char password[128];
 server * servers; 
+int num_servers;
 
 // Parses a file you give it
 int parseConfFile(const char *filename)
@@ -79,7 +80,7 @@ int parseConfFile(const char *filename)
     }
 
     // printf("%d\n", i);
-    // printf("%s\n", username);
+    // printf("%s\n", password);
     // printf("%s\n", servers[0].host);
     fclose(conf_file);
 
@@ -89,7 +90,7 @@ int parseConfFile(const char *filename)
 
 
 // Reads user input to get LIST, PUT, GET, QUIT, HELP commands
-void readUserInput(int sock) {
+void readUserInput() {
     char *line = NULL;      /* Line read from STDIN */
     size_t len;
     ssize_t read;
@@ -106,19 +107,19 @@ void readUserInput(int sock) {
         if (!strncasecmp(command, "LIST", 4)) {
             // printf("the command you entered was: %s\n", command);
             // printf("sock num %d\n", sock);
-            list(sock, command);
+            list(command);
         }
         else if (!strncasecmp(command, "GET", 3)) {
             if (strlen(line) <= 3)
                 printf("Check your args.\n");
             else
-                get(sock, line);
+                get(line);
         }
         else if (!strncasecmp(command, "PUT", 3)) {
             if (strlen(line) <= 3)
                 printf("Check your args.\n");
             else
-                put(sock, line);
+                put(line);
         }
         else if (!strncasecmp(command, "QUIT", 4) || !strncasecmp(command, "EXIT", 4)) {
             status = 0;
@@ -148,6 +149,9 @@ void recieveReplyFromServer(int sock){
 void authenticateUser(int sock, char * username, char * password)
 {
     char *result = malloc(strlen(username)+strlen(password));//+1 for the zero-terminator
+    char buf[MAX_BUFFER];
+    int len;
+
     strcpy(result, "LOGIN:");
     strcat(result, username);
     strcat(result, " ");
@@ -155,12 +159,14 @@ void authenticateUser(int sock, char * username, char * password)
     if (write(sock, result, strlen(result)) < 0){
         // puts("Authentication failed");
         errexit("Error in Authentication: %s\n", strerror(errno));
-
     }
+    recieveReplyFromServer(sock);
 }
 
-void list(int sock, char *command)
+void list(char *command)
 {
+
+    int sock = attemptToConnect();
     if(write(sock, command, strlen(command)) < 0) {
         // puts("List failed");
         errexit("Error in List: %s\n", strerror(errno));
@@ -168,9 +174,28 @@ void list(int sock, char *command)
     recieveReplyFromServer(sock);
 }
 
+int attemptToConnect()
+{
+    int sock;
+    int i;
+    // printf("numservers %d\n",num_servers );
+    for (i = 0; i < num_servers; ++i)
+    {
+        servers[i].fd = connectSocket(servers[i].port, servers[i].host);
+        if(servers[i].fd != 1)
+        {
+            sock = servers[i].fd;
+            // printf("%d\n", sock);
+            return sock;
+            // break; // found connection
+        }
+    }
+    return 0;
+}
+
 // send file via socket
 // http://stackoverflow.com/questions/2014033/send-and-receive-a-file-in-socket-programming-in-linux-with-c-c-gcc-g
-int put(int sock, char *line)
+int put(char *line)
 {
     struct timespec tim;
     tim.tv_sec = 0;
@@ -185,7 +210,7 @@ int put(int sock, char *line)
     char buffer[MAX_BUFFER];
     // int remaining = va_arg(args, off_t);
     char server_reply[MAX_BUFFER];
-
+    int sock = attemptToConnect();
 
 
     sscanf(line, "%s %s", command, arg);
@@ -204,16 +229,7 @@ int put(int sock, char *line)
 
     size = file_stat.st_size;
     sprintf(file_size, "%d", size);
-    // printf("%s\n", file_size);
-
-    // nanosleep(&tim, NULL); 
     
-    // if(recv(sock, server_reply, 2000, 0) < 0)
-        // errexit("Error in recv: %s\n", strerror(errno));
-        // puts("recv failed");
-    // printf("%s\n",server_reply);
-
-
     if (write(sock, file_size, sizeof(file_size)) < 0)
         errexit("Echo write: %s\n", strerror(errno));
 
@@ -244,10 +260,10 @@ int put(int sock, char *line)
             p += bytes_written;
         }
     }
-    return 0;   
+    return 0;  
 }
 
-int get(int sock, char *line)
+int get(char *line)
 {
     char buf[MAX_BUFFER];
     int read_size    = 0;
@@ -255,6 +271,18 @@ int get(int sock, char *line)
     FILE *downloaded_file;
     char command[8], arg[64];
     char file_loc[128];
+    int sock;
+    int i;
+
+    for (i = 0; i < num_servers; ++i)
+    {
+        servers[i].fd = connectSocket(servers[i].port, servers[i].host);
+        if(servers[i].fd != 1)
+        {
+            sock = servers[i].fd;
+            break; // found connection
+        }
+    }
 
     sscanf(line, "%s %s", command, arg);
     sprintf(file_loc, "./%s", arg);
@@ -301,7 +329,7 @@ int connectSocket(int port, const char *hostname)
         printf("Could not create socket");
     }
     // puts("Socket created");
-     printf("port num %d\n", port);
+     // printf("port num %d\n", port);
     server.sin_addr.s_addr = inet_addr(hostname);
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
@@ -309,13 +337,13 @@ int connectSocket(int port, const char *hostname)
     //Connect to remote server
     if (connect(sock, (struct sockaddr *)&server , sizeof(server)) < 0)
     {
-        perror("connect failed. Error");
+        // perror("connect failed. Error");
         return 1;
     }
 
     authenticateUser(sock, username, password);
 
-    printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
+    // printf("Socket %d connected on port %d\n", sock, ntohs(server.sin_port));
 
     return sock;
 }
@@ -334,7 +362,6 @@ int main(int argc, char *argv[], char **envp)
 {
     if(argv[1])
     {
-        int num_servers;
         int i;
         // int server_fd[64];
 
@@ -343,25 +370,23 @@ int main(int argc, char *argv[], char **envp)
 
         // Try to connect to the following servers.
         printf("There are %d servers in the config file.\n", num_servers);
-        printf("Attempting to connect...\n\n");
-        for (i = 0; i < num_servers; ++i)
-        {
-            // printf("%d\n", servers[i].port);
-            // printf("%s\n", servers[i].host);
-            servers[i].fd = connectSocket(servers[i].port, servers[i].host);
-        }
+        // printf("Attempting to connect...\n\n");
+        // for (i = 0; i < num_servers; ++i)
+        // {
+        //     servers[i].fd = connectSocket(servers[i].port, servers[i].host);
+        // }
 
         // Try to connect to one of the servers
-        for (i = 0; i < num_servers; i++)
-        {
-            if(servers[i].fd != 1)
-            {
-                printf("%d\n", servers[i].fd);
-                readUserInput(servers[i].fd);
+        // for (i = 0; i < num_servers; i++)
+        // {
+        //     if(servers[i].fd != 1)
+        //     {
+                // printf("%d\n", servers[i].fd);
+        readUserInput();
                 // connection found, break out of loop.
-                break;
-            }
-        }
+        //         break;
+        //     }
+        // }
         return 1;
     }
     else
