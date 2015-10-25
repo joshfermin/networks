@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <fcntl.h> //(for O_*)
+#include <openssl/md5.h> // for md5
 
 #include "configdfc.h"
 #define MAX_BUFFER 2000
@@ -149,8 +150,8 @@ void recieveReplyFromServer(int sock){
 void authenticateUser(int sock, char * username, char * password)
 {
     char *result = malloc(strlen(username)+strlen(password));//+1 for the zero-terminator
-    char buf[MAX_BUFFER];
-    int len;
+    // char buf[MAX_BUFFER];
+    // int len;
 
     strcpy(result, "LOGIN:");
     strcat(result, username);
@@ -197,70 +198,141 @@ int attemptToConnect()
 // http://stackoverflow.com/questions/2014033/send-and-receive-a-file-in-socket-programming-in-linux-with-c-c-gcc-g
 int put(char *line)
 {
-    struct timespec tim;
-    tim.tv_sec = 0;
-    tim.tv_nsec = 100000000L; /* 0.1 seconds */
-
-    char file_loc[128];
+    int i;
     int fd;
-    char file_size[256];
-    int size;
-    struct stat file_stat;
-    char command[8], arg[64];
-    char buffer[MAX_BUFFER];
-    // int remaining = va_arg(args, off_t);
-    char server_reply[MAX_BUFFER];
-    int sock = attemptToConnect();
+    long int len;
+    int part, finalpart;
+    struct stat fileStat; 
+    char filename[64];
+    char command[MAX_BUFFER];
+    char file_loc[128];
+    char strLength[MAX_BUFFER];
+    char partlen[MAX_BUFFER];
 
+    sscanf(line, "%s %s", command, filename);
 
-    sscanf(line, "%s %s", command, arg);
-    sprintf(file_loc, "%s/%s", FILE_DIR, arg);
+    sprintf(command, "PUT %s.1\n", filename);
+    printf("%s\n", command);
 
-    if(write(sock, line, strlen(line)) < 0) {
-        // puts("List failed");
-        errexit("Error in List: %s\n", strerror(errno));
+    for (i = 0; i < num_servers; ++i)
+    {
+        servers[i].fd = connectSocket(servers[i].port, servers[i].host);
+    }
+    // printf("Command: %s\n", command );
+
+    //Location Each Part is going
+    int p1a,p1b,p2a,p2b,p3a,p3b,p4a,p4b;
+
+    //Add Path to File Name
+    sprintf(file_loc, "%s/%s", FILE_DIR, filename);
+    printf("%s\n", file_loc);
+
+    // printf("File Name: %s \n", path );
+
+    //Open File for Reading
+    fd = open(file_loc, O_RDONLY);
+    if (fd == -1) {
+        printf("Error opening file!\n");
+        exit(1);
     }
 
-    if ((fd = open(file_loc, O_RDONLY)) < 0)
-        errexit("Failed to open file at: '%s' %s\n", file_loc, strerror(errno)); 
+    //Split File Into Parts
+    fstat(fd, &fileStat);
 
-    if (fstat(fd, &file_stat) < 0)
-        errexit("Error fstat file at: '%s' %s\n", file_loc, strerror(errno));
+    sprintf(strLength, "%d\n", fileStat.st_size);
 
-    size = file_stat.st_size;
-    sprintf(file_size, "%d", size);
+    len = atoi(strLength);
+
+    if(len>num_servers){
+        part = len/num_servers;
+    }
+
+
+    finalpart = (len - (part*num_servers)) + part;
+
+    sprintf(partlen, "%d\n", part);
     
-    if (write(sock, file_size, sizeof(file_size)) < 0)
-        errexit("Echo write: %s\n", strerror(errno));
+    unsigned char buf[part];
 
-    // nanosleep(&tim, NULL); 
+    int nread = read(fd, buf, part);
+    
+    //TODO Determine Mapping for File Part to Server
 
-    while (1) {
-        // Read data into buffer.  We may not have enough to fill up buffer, so we
-        // store how many bytes were actually read in bytes_read.
-        int bytes_read = read(fd, buffer, sizeof(buffer));
-        if (bytes_read == 0) // We're done reading from the file
-            break;
+    //Write Part 1
+    if(nread > 0) {
 
-        if (bytes_read < 0) {
-            // handle errors
-        }
+        p1a = 0;
+        p1b = 3;
 
-        // You need a loop for the write, because not all of the data may be written
-        // in one call; write will return how many bytes were written. p keeps
-        // track of where in the buffer we are, while we decrement bytes_read
-        // to keep track of how many bytes are left to write.
-        void *p = buffer;
-        while (bytes_read > 0) {
-            int bytes_written = write(sock, p, bytes_read);
-            if (bytes_written <= 0) {
-                // handle errors
-            }
-            bytes_read -= bytes_written;
-            p += bytes_written;
-        }
+        // printf("Sending: %s %d\n", command, servers[p1a].fd);
+        write(servers[p1a].fd, command, strlen(command));
+        write(servers[p1a].fd, partlen, strlen(partlen));
+        write(servers[p1a].fd, buf, nread);
+        write(servers[p1b].fd, command, strlen(command));
+        write(servers[p1b].fd, partlen, strlen(partlen));
+        write(servers[p1b].fd, buf, nread);
     }
-    return 0;  
+
+    //Write Part 2
+    sprintf(command, "PUT %s %s %s.2\n", username, password, filename);
+    nread = read(fd, buf, part);
+    if(nread > 0) {
+
+        p2a = 0;
+        p2b = 1;
+
+        printf("Sending: %s %d %d\n", command, servers[p2b].fd, nread);
+        write(servers[p2a].fd, command, strlen(command));
+        write(servers[p2a].fd, partlen, strlen(partlen));
+        write(servers[p2a].fd, buf, nread);
+        write(servers[p2b].fd, command, strlen(command));
+        write(servers[p2b].fd, partlen, strlen(partlen));
+        write(servers[p2b].fd, buf, nread);
+    }
+
+
+    //Write Part 3
+    sprintf(command, "PUT %s %s %s.3\n", username, password, filename);
+    nread = read(fd, buf, part);
+    if(nread > 0) {
+
+        p3a = 1;
+        p3b = 2;
+
+        // printf("Sending: %s %d\n", command, servers[p1a].fd);
+        write(servers[p3a].fd, command, strlen(command));
+        write(servers[p3a].fd, partlen, strlen(partlen));
+        write(servers[p3a].fd, buf, nread);
+        write(servers[p3b].fd, command, strlen(command));
+        write(servers[p3b].fd, partlen, strlen(partlen));
+        write(servers[p3b].fd, buf, nread);
+    }
+
+
+    //Write Part 4
+    sprintf(command, "PUT %s %s %s.4\n", username, password, filename);
+    nread = read(fd, buf, finalpart);
+    sprintf(partlen, "%d\n", finalpart);
+
+    if(nread > 0) {
+
+        p4a = 2;
+        p4b = 3;
+
+        // printf("Sending: %s %d\n", command, servers[p1a].fd);
+        write(servers[p4a].fd, command, strlen(command));
+        write(servers[p4a].fd, partlen, strlen(partlen));
+        write(servers[p4a].fd, buf, nread);
+        write(servers[p4b].fd, command, strlen(command));
+        write(servers[p4b].fd, partlen, strlen(partlen));
+        write(servers[p4b].fd, buf, nread);
+    }
+
+
+    // write(s.fd, "\0", 1);
+    close(fd);
+
+    printf("Finished PUTing\n");
 }
 
 int get(char *line)
@@ -271,18 +343,7 @@ int get(char *line)
     FILE *downloaded_file;
     char command[8], arg[64];
     char file_loc[128];
-    int sock;
-    int i;
-
-    for (i = 0; i < num_servers; ++i)
-    {
-        servers[i].fd = connectSocket(servers[i].port, servers[i].host);
-        if(servers[i].fd != 1)
-        {
-            sock = servers[i].fd;
-            break; // found connection
-        }
-    }
+    int sock = attemptToConnect();
 
     sscanf(line, "%s %s", command, arg);
     sprintf(file_loc, "./%s", arg);
@@ -362,7 +423,6 @@ int main(int argc, char *argv[], char **envp)
 {
     if(argv[1])
     {
-        int i;
         // int server_fd[64];
 
         // Get the number of servers
@@ -370,27 +430,14 @@ int main(int argc, char *argv[], char **envp)
 
         // Try to connect to the following servers.
         printf("There are %d servers in the config file.\n", num_servers);
-        // printf("Attempting to connect...\n\n");
-        // for (i = 0; i < num_servers; ++i)
-        // {
-        //     servers[i].fd = connectSocket(servers[i].port, servers[i].host);
-        // }
 
-        // Try to connect to one of the servers
-        // for (i = 0; i < num_servers; i++)
-        // {
-        //     if(servers[i].fd != 1)
-        //     {
-                // printf("%d\n", servers[i].fd);
         readUserInput();
-                // connection found, break out of loop.
-        //         break;
-        //     }
-        // }
         return 1;
     }
     else
     {
         printf("Please specify a config file.\n");
     }
+
+
 }

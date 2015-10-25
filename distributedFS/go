@@ -20,5 +20,5 @@ pkill -f dfc
     # echo "done..."
 # fi
 
-./dfs "/DFS1" "10002"
+./dfs "/DFS1" "10001"
 #./dfs "/DFS1" "10003" &
