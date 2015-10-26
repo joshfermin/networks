@@ -24,6 +24,7 @@
 
 #include "configdfc.h"
 #define MAX_BUFFER 2000
+#define REQ_TIMEOUT 1
 
 int parseConfFile(const char *);
 void readUserInput();
@@ -134,8 +135,15 @@ void readUserInput() {
     printf("Shutting down...\n");
 }
 
+// Recieves reply from server, waits one sec before timeout
 void recieveReplyFromServer(int sock){
     char server_reply[MAX_BUFFER];
+    struct timeval timeout;
+    int rv;
+    fd_set set;
+
+    timeout.tv_sec = REQ_TIMEOUT;
+    // if ((rv = select(sock+1, &set, NULL, NULL, &timeout)) > 0) {
     if( recv(sock, server_reply, 2000, 0) < 0)
     {
         errexit("Error in recv: %s\n", strerror(errno));
@@ -144,6 +152,7 @@ void recieveReplyFromServer(int sock){
         // server_reply[len] = '\0'; // null terminate server_reply
         puts(server_reply);
     }
+    // }
 }
 
 void authenticateUser(int sock, char * username, char * password)
@@ -163,6 +172,7 @@ void authenticateUser(int sock, char * username, char * password)
     recieveReplyFromServer(sock);
 }
 
+// sends LIST command to server
 void list(char *command)
 {
 
@@ -174,6 +184,8 @@ void list(char *command)
     recieveReplyFromServer(sock);
 }
 
+
+// Attempts to connect to one socket.
 int attemptToConnect()
 {
     int sock;
@@ -236,8 +248,6 @@ int put(char *line)
     // nanosleep(&tim, NULL); 
 
     while (1) {
-        // Read data into buffer.  We may not have enough to fill up buffer, so we
-        // store how many bytes were actually read in bytes_read.
         int bytes_read = read(fd, buffer, sizeof(buffer));
         if (bytes_read == 0) // We're done reading from the file
             break;
@@ -246,11 +256,7 @@ int put(char *line)
             // handle errors
         }
 
-        // You need a loop for the write, because not all of the data may be written
-        // in one call; write will return how many bytes were written. p keeps
-        // track of where in the buffer we are, while we decrement bytes_read
-        // to keep track of how many bytes are left to write.
-        void *p = buffer;
+       void *p = buffer;
         while (bytes_read > 0) {
             int bytes_written = write(sock, p, bytes_read);
             if (bytes_written <= 0) {
@@ -348,7 +354,7 @@ int connectSocket(int port, const char *hostname)
     return sock;
 }
 
-
+// Error handling
 int errexit(const char *format, ...) {
         va_list args;
 
