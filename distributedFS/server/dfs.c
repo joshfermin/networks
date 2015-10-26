@@ -182,7 +182,7 @@ int authenticateUser(int socket, char * username, char * password)
 
 	strcpy(directory, server_directory);
 	strcat(directory, username);
-	printf("usernameL %s password: %s\n", username, password);
+	// printf("usernameL %s password: %s\n", username, password);
 	for (i = 0; i < num_users; i++){
 		if (strncmp(users[i].name, username, strlen(username)) == 0){
 			if(strncmp(users[i].password, password, strlen(password)) == 0)
@@ -214,7 +214,7 @@ int connectSocket(int port, const char *hostname)
 		printf("Could not create socket");
 	}
 	// puts("Socket created");
-	 printf("port num %d\n", port);
+	 // printf("port num %d\n", port);
 	server.sin_addr.s_addr = inet_addr(hostname);
 	server.sin_family = AF_INET;
 	server.sin_port = htons(port);
@@ -335,33 +335,37 @@ void serverPut(int sock, char * arg)
 {
 	char buf[MAX_BUFFER];
 	char file_path[128];
-	int file_size, remaining;
+	int read_size = 0;
+	int len = 0;
+	// int file_size, remaining;
 	// int len2;
 	FILE *file;
 
 	sprintf(file_path, "%s%s/", server_directory, currUser.name);
 	strncat(file_path, arg, strlen(arg));
-	// printf("%s\n", file_path);
+	printf("%s\n", file_path);
 
 
 	if (!(file = fopen(file_path, "w")))
 		errexit("Failed to open file at: '%s' %s\n", file_path, strerror(errno)); 
 
-	readline(sock, buf, 15);
+	while ((read_size = recv(sock, &buf[len], (MAX_BUFFER-len), 0)) > 0)
+	{
+	    int len = atoi(buf);
+	    printf("%s\n", buf);
+	    // printf("File Len: %d\n", len);
 
-    int len = atoi(buf);
+	    //Keep reading lines from client
+	    // printf("%s\n", buf);
+	    //Write Line to File
+	    fprintf(file, "%s", buf);
+    	fclose(file);
+    	return;
 
-    // printf("File Len: %d\n", len);
-
-    //Keep reading lines from client
-    read(sock, buf, len);
-
-    //Write Line to File
-    fprintf(file, "%s", buf);
+	}
 
 
     //Close File
-    fclose(file);
 	// fclose(file);
 }
 int readline(int fd, char * buf, int maxlen) {

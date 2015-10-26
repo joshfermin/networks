@@ -256,8 +256,6 @@ int put(char *line)
 
     int nread = read(fd, buf, part);
     
-    //TODO Determine Mapping for File Part to Server
-
     //Write Part 1
     if(nread > 0) {
 
@@ -274,7 +272,8 @@ int put(char *line)
     }
 
     //Write Part 2
-    sprintf(command, "PUT %s %s %s.2\n", username, password, filename);
+    // sprintf(command, "PUT %s %s %s.2\n", username, password, filename);
+    sprintf(command, "PUT %s.2\n", filename);
     nread = read(fd, buf, part);
     if(nread > 0) {
 
@@ -292,7 +291,9 @@ int put(char *line)
 
 
     //Write Part 3
-    sprintf(command, "PUT %s %s %s.3\n", username, password, filename);
+    // sprintf(command, "PUT %s %s %s.3\n", username, password, filename);
+    sprintf(command, "PUT %s.3\n", filename);
+
     nread = read(fd, buf, part);
     if(nread > 0) {
 
@@ -310,7 +311,9 @@ int put(char *line)
 
 
     //Write Part 4
-    sprintf(command, "PUT %s %s %s.4\n", username, password, filename);
+    // sprintf(command, "PUT %s %s %s.4\n", username, password, filename);
+    sprintf(command, "PUT %s.4\n", filename);
+
     nread = read(fd, buf, finalpart);
     sprintf(partlen, "%d\n", finalpart);
 
@@ -332,7 +335,7 @@ int put(char *line)
     // write(s.fd, "\0", 1);
     close(fd);
 
-    printf("Finished PUTing\n");
+    // printf("Finished PUTing\n");
 }
 
 int get(char *line)
