@@ -19,10 +19,18 @@ void accept_request(int);
 
 void accept_request(int socket)
 {
-	// char buf[MAX_BUFFER];
+	char buf[MAX_BUFFER];
+	int read_size = 0, len = 0;
 
-	// while ((read_size = recv(socket, &buf[len], (MAX_BUFFER-len), 0)) > 0)
-	// { 
+	while ((read_size = recv(socket, &buf[len], (MAX_BUFFER-len), 0)) > 0)
+	{ 
+		char line[read_size];
+		strncpy(line, &buf[len], sizeof(line));
+		len += read_size;
+		line[read_size] = '\0';
+
+		printf("Found:  %s\n", line);
+	}
 }
 
 int listenOnPort(int port)
