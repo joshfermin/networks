@@ -10,27 +10,141 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <netdb.h> // for struct hostent
 
 #define INT_MIN 1024
 #define MAX_BUFFER 2000
 
 int listenOnPort(int);
 void accept_request(int);
+void removeChar(char *, char );
 
 void accept_request(int socket)
 {
 	char buf[MAX_BUFFER];
 	int read_size = 0, len = 0;
+	// struct hostent *server;
+	struct addrinfo *result;
+    struct addrinfo *res;
+    // struct hostent *server;
 
 	while ((read_size = recv(socket, &buf[len], (MAX_BUFFER-len), 0)) > 0)
 	{ 
+		int counter = 0;
+		int error, i;
 		char line[read_size];
+		char method[32];
+		char host[512];
+		char http_version[64];
+		char firstHalf[500];
+	    char secondHalf[500];
 		strncpy(line, &buf[len], sizeof(line));
 		len += read_size;
 		line[read_size] = '\0';
 
+		// memset(firstHalf, 0, sizeof firstHalf);
+		// memset(secondHalf, 0, sizeof secondHalf);
+		// memset(host, 0, sizeof host);
+
+
 		printf("Found:  %s\n", line);
+
+		sscanf(line, "%s %s %s", method, host, http_version);
+		// printf("%s %s %s\n", method, host, http_version);
+
+		if(strncmp(host, "http://", 7) == 0)
+		{
+			printf("remove http\n");
+			memmove(host, host + 7, (512 - 7) / sizeof(host[0])); // remove http://
+		}
+
+		if(strncmp(host, "https://", 8) == 0)
+		{
+			printf("remove https\n");
+			memmove(host, host + 8, (512 - 8) / sizeof(host[0])); // remove https://
+		}
+
+
+		// not being used right now...
+		for (i = 0; i < strlen(host); i++)
+	    {
+	        if (host[i] == '/')
+	        {
+	                strncpy(firstHalf, host, i);
+	                firstHalf[i] = '\0';
+	                break;
+	        }     
+	    }
+	     
+	    for (i; i < strlen(host); i++)
+	    {
+	        strcat(secondHalf, &host[i]);
+	        break;
+	    }
+	    
+	    if(host[strlen(host) - 1] == '/')
+	    {
+	    	host[strlen(host)-1] = '\0';
+	    }
+	    // removeChar(secondHalf, '\\');
+	    
+	    printf("firsthalf: %s second: %s host: %s\n", firstHalf, secondHalf, host );
+
+		// server = gethostbyname("www.yahoo.com");
+		// if (server == NULL)
+	 //    {
+	 //        printf("gethostbyname() failed\n");
+	 //    }
+	 //    else
+	 //    {
+	 //        printf("\n%s = ", server->h_name);
+	 //        unsigned int j = 0;
+	 //        while (server -> h_addr_list[j] != NULL)
+	 //        {
+	 //            printf("%s", inet_ntoa(*(struct in_addr*)(server -> h_addr_list[j])));
+	 //            j++;
+	 //        }
+	 //    }
+    	error = getaddrinfo(host, NULL, NULL, &result);
+    	if (error != 0)
+	    {   
+	        if (error == EAI_SYSTEM)
+	        {
+	            perror("getaddrinfo");
+	        }
+	        else
+	        {
+	            fprintf(stderr, "error in getaddrinfo: %s\n", gai_strerror(error));
+	        }   
+	        exit(EXIT_FAILURE);
+	    }   
+	    for (res = result; res != NULL; res = res->ai_next)
+	    {   
+	        char hostname[1025];
+
+	        error = getnameinfo(res->ai_addr, res->ai_addrlen, hostname, 1025, NULL, 0, 0); 
+	        if (error != 0)
+	        {
+	            fprintf(stderr, "error in getnameinfo: %s\n", gai_strerror(error));
+	            continue;
+	        }
+	        if (*hostname != '\0')
+	            printf("hostname: %s\n", hostname);
+	    }   
+
+	    freeaddrinfo(result);
+
 	}
+}
+
+void removeChar(char *str, char garbage) {
+
+    char *src, *dst;
+    for (src = dst = str; *src != '\0'; src++) {
+        *dst = *src;
+        if (*dst != garbage) dst++;
+    }
+    *dst = '\0';
 }
 
 int listenOnPort(int port)
@@ -109,3 +223,6 @@ int main(int argc, char *argv[], char **envp)
 
 	listenOnPort(port);
 }
+
+//https://github.com/shawnzam/webproxy-assignment-/blob/master/main.c
+//http://cboard.cprogramming.com/c-programming/142841-sending-http-get-request-c.html
