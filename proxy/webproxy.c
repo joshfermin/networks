@@ -117,13 +117,14 @@ void process_get(char* host, int sock, char* request)
    
     // bzero(request, 1000);
     strcat(request, "\r\n");
-    
+
     if (send(tcpSocket, request, strlen(request), 0) < 0)
         printf("Error with send()");
      
     bzero(response, 1000);
  	recv(tcpSocket, response, 999, 0);
-    printf("\n%s", response);
+    // printf("\n%s", response);
+    write(sock, response, strlen(response));
 
 }
 
