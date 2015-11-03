@@ -48,49 +48,6 @@ void accept_request(int socket)
 		} else {
 			printf("This is not a supported method\n");
 		}
-		
-
-	    // else
-	    // {
-	    //     printf("\n%s = ", server->h_name);
-	    //     unsigned int j = 0;
-	    //     while (server -> h_addr_list[j] != NULL)
-	    //     {
-	    //         printf("%s", inet_ntoa(*(struct in_addr*)(server -> h_addr_list[j])));
-	    //         j++;
-	    //     }
-	    // }
-
-
-    	// error = getaddrinfo(host, NULL, NULL, &result);
-    	// if (error != 0)
-	    // {   
-	    //     if (error == EAI_SYSTEM)
-	    //     {
-	    //         perror("getaddrinfo");
-	    //     }
-	    //     else
-	    //     {
-	    //         fprintf(stderr, "error in getaddrinfo: %s\n", gai_strerror(error));
-	    //     }   
-	    //     exit(EXIT_FAILURE);
-	    // }   
-	    // for (res = result; res != NULL; res = res->ai_next)
-	    // {   
-	    //     char hostname[1025];
-
-	    //     error = getnameinfo(res->ai_addr, res->ai_addrlen, hostname, 1025, NULL, 0, 0); 
-	    //     if (error != 0)
-	    //     {
-	    //         fprintf(stderr, "error in getnameinfo: %s\n", gai_strerror(error));
-	    //         continue;
-	    //     }
-	    //     if (*hostname != '\0')
-	    //         printf("hostname: %s\n", hostname);
-	    // }   
-
-	    // freeaddrinfo(result);
-
 	}
 }
 
@@ -100,6 +57,7 @@ void process_get(char* host, int sock, char* request)
 	int error, i;
 	char firstHalf[500];
     char secondHalf[500];
+    char response[1000];
     struct hostent *server;
     struct sockaddr_in serveraddr;
 
@@ -141,25 +99,43 @@ void process_get(char* host, int sock, char* request)
     printf("Official name is: %s\n", server->h_name);
 	printf("IP address: %s\n", inet_ntoa(*(struct in_addr*)server->h_addr));
 
+
+
+
+
     bzero((char *) &serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
 
     bcopy((char *)server->h_addr, (char *)&serveraddr.sin_addr.s_addr, server->h_length);
-     
     serveraddr.sin_port = htons(80);
+
+    // create new socket to connect to host
+	int tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
+
+	if (connect(tcpSocket, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)
+        printf("\nError Connecting");
+   
+    // bzero(request, 1000);
+    strcat(request, "\r\n");
+    
+    if (send(tcpSocket, request, strlen(request), 0) < 0)
+        printf("Error with send()");
+     
+    bzero(response, 1000);
+ 	recv(tcpSocket, response, 999, 0);
+    printf("\n%s", response);
+
 }
 
 void remove_http(char* host)
 {
 	if(strncmp(host, "http://", 7) == 0)
 	{
-		printf("remove http\n");
 		memmove(host, host + 7, (512 - 7) / sizeof(host[0])); // remove http://
 	}
 
 	if(strncmp(host, "https://", 8) == 0)
 	{
-		printf("remove https\n");
 		memmove(host, host + 8, (512 - 8) / sizeof(host[0])); // remove https://
 	}
 }
@@ -167,8 +143,7 @@ void remove_http(char* host)
 int listenOnPort(int port)
 {
 	int one = 1, client_fd, status;
-	// pthread_t newthread;
-
+\
 	// sockaddr: structure to contain an internet address.
 	struct sockaddr_in svr_addr, cli_addr;
 	socklen_t sin_len = sizeof(cli_addr);
