@@ -17,134 +17,151 @@
 
 int listenOnPort(int);
 void accept_request(int);
-void removeChar(char *, char );
+void process_get(char*, int, char*);
+void remove_http(char*);
 
 void accept_request(int socket)
 {
 	char buf[MAX_BUFFER];
 	int read_size = 0, len = 0;
-	// struct hostent *server;
-	struct addrinfo *result;
-    struct addrinfo *res;
-    // struct hostent *server;
 
 	while ((read_size = recv(socket, &buf[len], (MAX_BUFFER-len), 0)) > 0)
 	{ 
-		int counter = 0;
-		int error, i;
 		char line[read_size];
 		char method[32];
 		char host[512];
 		char http_version[64];
-		char firstHalf[500];
-	    char secondHalf[500];
 		strncpy(line, &buf[len], sizeof(line));
 		len += read_size;
 		line[read_size] = '\0';
-
-		// memset(firstHalf, 0, sizeof firstHalf);
-		// memset(secondHalf, 0, sizeof secondHalf);
-		// memset(host, 0, sizeof host);
-
 
 		printf("Found:  %s\n", line);
 
 		sscanf(line, "%s %s %s", method, host, http_version);
 		// printf("%s %s %s\n", method, host, http_version);
 
-		if(strncmp(host, "http://", 7) == 0)
+		
+		if(strncmp(method, "GET", 3) == 0)
 		{
-			printf("remove http\n");
-			memmove(host, host + 7, (512 - 7) / sizeof(host[0])); // remove http://
+			printf("Processing GET");
+			process_get(host, socket, line);
+		} else {
+			printf("This is not a supported method\n");
 		}
+		
 
-		if(strncmp(host, "https://", 8) == 0)
-		{
-			printf("remove https\n");
-			memmove(host, host + 8, (512 - 8) / sizeof(host[0])); // remove https://
-		}
+	    // else
+	    // {
+	    //     printf("\n%s = ", server->h_name);
+	    //     unsigned int j = 0;
+	    //     while (server -> h_addr_list[j] != NULL)
+	    //     {
+	    //         printf("%s", inet_ntoa(*(struct in_addr*)(server -> h_addr_list[j])));
+	    //         j++;
+	    //     }
+	    // }
 
 
-		// not being used right now...
-		for (i = 0; i < strlen(host); i++)
-	    {
-	        if (host[i] == '/')
-	        {
-	                strncpy(firstHalf, host, i);
-	                firstHalf[i] = '\0';
-	                break;
-	        }     
-	    }
-	     
-	    for (i; i < strlen(host); i++)
-	    {
-	        strcat(secondHalf, &host[i]);
-	        break;
-	    }
-	    
-	    if(host[strlen(host) - 1] == '/')
-	    {
-	    	host[strlen(host)-1] = '\0';
-	    }
-	    // removeChar(secondHalf, '\\');
-	    
-	    printf("firsthalf: %s second: %s host: %s\n", firstHalf, secondHalf, host );
+    	// error = getaddrinfo(host, NULL, NULL, &result);
+    	// if (error != 0)
+	    // {   
+	    //     if (error == EAI_SYSTEM)
+	    //     {
+	    //         perror("getaddrinfo");
+	    //     }
+	    //     else
+	    //     {
+	    //         fprintf(stderr, "error in getaddrinfo: %s\n", gai_strerror(error));
+	    //     }   
+	    //     exit(EXIT_FAILURE);
+	    // }   
+	    // for (res = result; res != NULL; res = res->ai_next)
+	    // {   
+	    //     char hostname[1025];
 
-		// server = gethostbyname("www.yahoo.com");
-		// if (server == NULL)
-	 //    {
-	 //        printf("gethostbyname() failed\n");
-	 //    }
-	 //    else
-	 //    {
-	 //        printf("\n%s = ", server->h_name);
-	 //        unsigned int j = 0;
-	 //        while (server -> h_addr_list[j] != NULL)
-	 //        {
-	 //            printf("%s", inet_ntoa(*(struct in_addr*)(server -> h_addr_list[j])));
-	 //            j++;
-	 //        }
-	 //    }
-    	error = getaddrinfo(host, NULL, NULL, &result);
-    	if (error != 0)
-	    {   
-	        if (error == EAI_SYSTEM)
-	        {
-	            perror("getaddrinfo");
-	        }
-	        else
-	        {
-	            fprintf(stderr, "error in getaddrinfo: %s\n", gai_strerror(error));
-	        }   
-	        exit(EXIT_FAILURE);
-	    }   
-	    for (res = result; res != NULL; res = res->ai_next)
-	    {   
-	        char hostname[1025];
+	    //     error = getnameinfo(res->ai_addr, res->ai_addrlen, hostname, 1025, NULL, 0, 0); 
+	    //     if (error != 0)
+	    //     {
+	    //         fprintf(stderr, "error in getnameinfo: %s\n", gai_strerror(error));
+	    //         continue;
+	    //     }
+	    //     if (*hostname != '\0')
+	    //         printf("hostname: %s\n", hostname);
+	    // }   
 
-	        error = getnameinfo(res->ai_addr, res->ai_addrlen, hostname, 1025, NULL, 0, 0); 
-	        if (error != 0)
-	        {
-	            fprintf(stderr, "error in getnameinfo: %s\n", gai_strerror(error));
-	            continue;
-	        }
-	        if (*hostname != '\0')
-	            printf("hostname: %s\n", hostname);
-	    }   
-
-	    freeaddrinfo(result);
+	    // freeaddrinfo(result);
 
 	}
 }
 
-void removeChar(char *str, char garbage) {
+void process_get(char* host, int sock, char* request)
+{
+	int counter = 0;
+	int error, i;
+	char firstHalf[500];
+    char secondHalf[500];
+    struct hostent *server;
+    struct sockaddr_in serveraddr;
 
-    char *src, *dst;
-    for (src = dst = str; *src != '\0'; src++) {
-        *dst = *src;
-        if (*dst != garbage) dst++;
+	remove_http(host);
+
+	// not being used right now...
+	for (i = 0; i < strlen(host); i++)
+    {
+        if (host[i] == '/')
+        {
+                strncpy(firstHalf, host, i);
+                firstHalf[i] = '\0';
+                break;
+        }     
     }
-    *dst = '\0';
+    
+    for (i; i < strlen(host); i++)
+    {
+        strcat(secondHalf, &host[i]);
+        break;
+    }
+
+    if(host[strlen(host) - 1] == '/')
+    {
+    	host[strlen(host)-1] = '\0';
+    }
+    // removeChar(secondHalf, '\\');
+    
+    printf("firsthalf: %s second: %s host: %s\n", firstHalf, secondHalf, host );
+
+	server = gethostbyname(host);
+
+	if (server == NULL)
+    {
+    	// write(sock, result, strlen(result));
+        printf("gethostbyname() failed\n");
+    }
+
+    printf("Official name is: %s\n", server->h_name);
+	printf("IP address: %s\n", inet_ntoa(*(struct in_addr*)server->h_addr));
+
+    bzero((char *) &serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+
+    bcopy((char *)server->h_addr, (char *)&serveraddr.sin_addr.s_addr, server->h_length);
+     
+    serveraddr.sin_port = htons(80);
+}
+
+void remove_http(char* host)
+{
+	if(strncmp(host, "http://", 7) == 0)
+	{
+		printf("remove http\n");
+		memmove(host, host + 7, (512 - 7) / sizeof(host[0])); // remove http://
+	}
+
+	if(strncmp(host, "https://", 8) == 0)
+	{
+		printf("remove https\n");
+		memmove(host, host + 8, (512 - 8) / sizeof(host[0])); // remove https://
+	}
 }
 
 int listenOnPort(int port)
