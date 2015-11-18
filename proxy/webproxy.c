@@ -63,23 +63,6 @@ void process_get(char* host, int sock, char* request)
 
 	remove_http(host);
 
-	// not being used right now...
-	for (i = 0; i < strlen(host); i++)
-    {
-        if (host[i] == '/')
-        {
-                strncpy(firstHalf, host, i);
-                firstHalf[i] = '\0';
-                break;
-        }     
-    }
-    
-    for (i; i < strlen(host); i++)
-    {
-        strcat(secondHalf, &host[i]);
-        break;
-    }
-
     if(host[strlen(host) - 1] == '/')
     {
     	host[strlen(host)-1] = '\0';
@@ -143,8 +126,8 @@ void remove_http(char* host)
 
 int listenOnPort(int port)
 {
-	int one = 1, client_fd, status;
-\
+	int keepalive = 1, client_fd, status;
+
 	// sockaddr: structure to contain an internet address.
 	struct sockaddr_in svr_addr, cli_addr;
 	socklen_t sin_len = sizeof(cli_addr);
@@ -157,7 +140,7 @@ int listenOnPort(int port)
 
 	// (int socket SOL_SOCKET to set options at socket level, allows reuse of local addresses,
 	// option value, size of socket)
-	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
+	setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
 
 
 	svr_addr.sin_family = AF_INET;
