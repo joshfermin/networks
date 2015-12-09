@@ -46,24 +46,28 @@ void accept_request(int socket)
 	}
 }
 
-void remove_http(char* host)
+void set_up_dnat(struct sockaddr_in svr_addr)
 {
-	if(strncmp(host, "http://", 7) == 0)
-	{
-		memmove(host, host + 7, (512 - 7) / sizeof(host[0])); // remove http://
-	}
+	int fd;
+	struct ifreq ifr;
+	char Dnat[MAX_BUFFER];
 
-	if(strncmp(host, "https://", 8) == 0)
-	{
-		memmove(host, host + 8, (512 - 8) / sizeof(host[0])); // remove https://
-	}
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	ifr.ifr_addr.sa_family = AF_INET;
+	strncpy(ifr.ifr_name, "eth1", IFNAMSIZ-1);
+	ioctl(fd, SIOCGIFADDR, &ifr);
+	close(fd);
+
+    sprintf(Dnat, "iptables -t nat -A PREROUTING -p tcp -i eth1 -j DNAT --to %s:%d", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr), ntohs(svr_addr.sin_port));
+    printf("DNAT RULES: %s\n", Dnat);
+    system(Dnat);
+    printf("\nserver port %d: waiting for connections...\n", ntohs(svr_addr.sin_port));
 }
 
 int listenOnPort()
 {
 	int port = 8080;
 	int client_fd, status;
-	char DnatRules[MAX_BUFFER];
 
 	// sockaddr: structure to contain an internet address.
 	struct sockaddr_in svr_addr, cli_addr;
@@ -89,20 +93,7 @@ int listenOnPort()
 		listen(sock, 5); // 5 is backlog - limits amount of connections in socket listen queue
 		printf("listening on localhost with port %d\n", port);
 
-	int fd;
-	struct ifreq ifr;
-	//This grabs the information from ifconfig for eth1, in order to write the DNAT rule
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
-	ifr.ifr_addr.sa_family = AF_INET;
-	strncpy(ifr.ifr_name, "eth1", IFNAMSIZ-1);
-	ioctl(fd, SIOCGIFADDR, &ifr);
-	close(fd);
-
-	//Writing out the DNAT rule
-    sprintf(DnatRules, "iptables -t nat -A PREROUTING -p tcp -i eth1 -j DNAT --to %s:%d", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr), ntohs(svr_addr.sin_port));
-    printf("DNAT RULES: %s\n", DnatRules);
-    system(DnatRules);
-    printf("\nserver port %d: waiting for connections...\n", ntohs(svr_addr.sin_port));
+	set_up_dnat(svr_addr);
 
 	while (1)
 	{
@@ -119,15 +110,8 @@ int listenOnPort()
 	close(sock);
 }
 
-int main(int argc, char *argv[])
+int main()
 {
-	if(argc != 2)
-	{
-		printf("Please check your arguments.");
-		return -1;
-	}
-
-
 	listenOnPort();
 }
 //http://cboard.cprogramming.com/c-programming/142841-sending-http-get-request-c.html
