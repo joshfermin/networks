@@ -3,7 +3,8 @@ To run:
 ```bash
 make clean
 make
-./webproxy <port number>
+./echo_server <port number>
+./transparent_proxy <port number>
 ```
 
 ###Design
@@ -11,6 +12,7 @@ This proxy consists of 3 main functions
 * listenOnPort(int port)
 * accept_request(int socket)
 * process_get(char* host, int sock, char* request)
+There is also an echo server to be used on the server. The client will talk to this echo server via telnet and the proxy.
 
 ####listenOnPort(int port)
 * This function was copied over from the previous assignments. Basically it opens a socket on localhost with a given port. 

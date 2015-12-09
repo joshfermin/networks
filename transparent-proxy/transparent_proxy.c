@@ -1,23 +1,33 @@
-#include <stdio.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
+#include <errno.h>
 #include <arpa/inet.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <strings.h>
-#include <string.h>
-#include <sys/stat.h>
+#include <signal.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
+#include <sys/errno.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/shm.h>
+#include <dirent.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <time.h>
+
+#include <stdarg.h>
+#include <unistd.h>
 #include <stdlib.h>
-#include <netdb.h> // for struct hostent
+#include <string.h>
+#include <stdio.h>
 
 #define INT_MIN 1024
 #define MAX_BUFFER 2000
 
-int listenOnPort(int);
+int listenOnPort();
 void accept_request(int);
-void process_get(char*, int, char*);
 void remove_http(char*);
 
 void accept_request(int socket)
@@ -28,87 +38,12 @@ void accept_request(int socket)
 	while ((read_size = recv(socket, &buf[len], (MAX_BUFFER-len), 0)) > 0)
 	{ 
 		char line[read_size];
-		char method[32];
-		char host[512];
-		char http_version[64];
 		strncpy(line, &buf[len], sizeof(line));
 		len += read_size;
 		line[read_size] = '\0';
 
 		printf("Found:  %s\n", line);
-
-		sscanf(line, "%s %s %s", method, host, http_version);
-		// printf("%s %s %s\n", method, host, http_version);
-
-		
-		if(strncmp(method, "GET", 3) == 0)
-		{
-			printf("Processing GET");
-			process_get(host, socket, line);
-		} else {
-			printf("This is not a supported method\n");
-		}
 	}
-}
-
-void process_get(char* host, int sock, char* request)
-{
-	int counter = 0;
-	int error, i;
-	char firstHalf[500];
-    char secondHalf[500];
-    char response[1000];
-    struct hostent *server;
-    struct sockaddr_in serveraddr;
-
-	remove_http(host);
-
-    if(host[strlen(host) - 1] == '/')
-    {
-    	host[strlen(host)-1] = '\0';
-    }
-    // removeChar(secondHalf, '\\');
-    
-    printf("firsthalf: %s second: %s host: %s\n", firstHalf, secondHalf, host );
-
-	server = gethostbyname(host);
-
-	if (server == NULL)
-    {
-    	// write(sock, result, strlen(result));
-        printf("gethostbyname() failed\n");
-    }
-
-    printf("Official name is: %s\n", server->h_name);
-	printf("IP address: %s\n", inet_ntoa(*(struct in_addr*)server->h_addr));
-
-
-
-
-
-    bzero((char *) &serveraddr, sizeof(serveraddr));
-    serveraddr.sin_family = AF_INET;
-
-    bcopy((char *)server->h_addr, (char *)&serveraddr.sin_addr.s_addr, server->h_length);
-    serveraddr.sin_port = htons(80);
-
-    // create new socket to connect to host
-	int tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
-
-	if (connect(tcpSocket, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)
-        printf("\nError Connecting");
-   
-    // bzero(request, 1000);
-    strcat(request, "\r\n");
-
-    if (send(tcpSocket, request, strlen(request), 0) < 0)
-        printf("Error with send()");
-     
-    bzero(response, 1000);
- 	recv(tcpSocket, response, 999, 0);
-    // printf("\n%s", response);
-    write(sock, response, strlen(response));
-
 }
 
 void remove_http(char* host)
@@ -124,9 +59,11 @@ void remove_http(char* host)
 	}
 }
 
-int listenOnPort(int port)
+int listenOnPort()
 {
-	int keepalive = 1, client_fd, status;
+	int port = 8080;
+	int client_fd, status;
+	char DnatRules[MAX_BUFFER];
 
 	// sockaddr: structure to contain an internet address.
 	struct sockaddr_in svr_addr, cli_addr;
@@ -138,15 +75,10 @@ int listenOnPort(int port)
 	if (sock < 0)
 		fprintf(stderr, "Can't open socket\n");
 
-	// (int socket SOL_SOCKET to set options at socket level, allows reuse of local addresses,
-	// option value, size of socket)
-	setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
-
-
 	svr_addr.sin_family = AF_INET;
-	svr_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	svr_addr.sin_addr.s_addr = INADDR_ANY;
 	svr_addr.sin_port = htons(port); // host to network short (htons)
-
+	bzero(svr_addr.sin_zero, 8);
 	// Start server
 		if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
 			close(sock);
@@ -157,6 +89,20 @@ int listenOnPort(int port)
 		listen(sock, 5); // 5 is backlog - limits amount of connections in socket listen queue
 		printf("listening on localhost with port %d\n", port);
 
+	int fd;
+	struct ifreq ifr;
+	//This grabs the information from ifconfig for eth1, in order to write the DNAT rule
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	ifr.ifr_addr.sa_family = AF_INET;
+	strncpy(ifr.ifr_name, "eth1", IFNAMSIZ-1);
+	ioctl(fd, SIOCGIFADDR, &ifr);
+	close(fd);
+
+	//Writing out the DNAT rule
+    sprintf(DnatRules, "iptables -t nat -A PREROUTING -p tcp -i eth1 -j DNAT --to %s:%d", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr), ntohs(svr_addr.sin_port));
+    printf("DNAT RULES: %s\n", DnatRules);
+    system(DnatRules);
+    printf("\nserver port %d: waiting for connections...\n", ntohs(svr_addr.sin_port));
 
 	while (1)
 	{
@@ -173,7 +119,7 @@ int listenOnPort(int port)
 	close(sock);
 }
 
-int main(int argc, char *argv[], char **envp)
+int main(int argc, char *argv[])
 {
 	if(argc != 2)
 	{
@@ -181,22 +127,7 @@ int main(int argc, char *argv[], char **envp)
 		return -1;
 	}
 
-	// Get Port number
-	char *p;
-	int port, errno = 0;
-	long conv = strtol(argv[1], &p, 10);
-	// printf("%d\n", conv);
 
-	// Check for errors: e.g., the string does not represent an integer
-	// or the integer is larger than int
-	if (errno != 0 || *p != '\0' || conv <= INT_MIN) {
-	    // Put here the handling of the error, like exiting the program with
-	    // an error message
-	    fprintf(stderr, "Invalid port number.\n");
-	} else {
-	    port = conv;    
-	}
-
-	listenOnPort(port);
+	listenOnPort();
 }
 //http://cboard.cprogramming.com/c-programming/142841-sending-http-get-request-c.html
