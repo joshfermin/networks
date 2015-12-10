@@ -28,105 +28,7 @@ int listenOnPort();
 void accept_request(int);
 void set_up_dnat(struct sockaddr_in);
 void remove_http(char*);
-void *get_in_addr(struct sockaddr *);
-
-void accept_request(int sock)
-{
-	char buf[MAX_BUFFER];
-	int read_size = 0, len = 0;
-    int server;
-
-	struct sockaddr_in s_hints;
-    struct sockaddr_in server_addr;
-    struct sockaddr_in p_addr;
-    struct sockaddr_in d_addr;
-	socklen_t s_addrlen; 
-	socklen_t p_addrlen; 
-	socklen_t d_addrlen; 
-	s_addrlen = sizeof(struct sockaddr_in);
-	p_addrlen = sizeof(struct sockaddr_in);			
-	d_addrlen = sizeof(struct sockaddr_in);
-
-	if ((server = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-	{
-		perror("\nserver: socket");
-		exit(-1);
-	}
-
-	s_hints.sin_family = AF_INET;
-	s_hints.sin_port = 0;
-	s_hints.sin_addr.s_addr = INADDR_ANY; 
-	bzero(&s_hints.sin_zero, 8);
-
-	if((bind(server, (struct sockaddr *) &s_hints, sizeof(s_hints))) == -1)
-	{
-		perror("bind: ");
-		exit(-1);
-	}
-
-	if((getsockopt(sock, SOL_IP, 80, (struct sockaddr *) &d_addr, &d_addrlen)) == -1){
-		perror("getsockopt: ");
-		exit(-1);
-	}
-
-	if((getsockname(server, (struct sockaddr *) &server_addr, &s_addrlen)) == -1){
-		perror("getsockname: ");
-		exit(-1);		
-	}
-
-	if((getpeername(sock, (struct sockaddr *) &p_addr, &p_addrlen)) == -1){
-		perror("getpeername: ");
-		exit(-1);		
-	}
-
-	char Snat[MAX_BUFFER];
-	sprintf(Snat, "iptables -t nat -A POSTROUTING -p tcp -j SNAT --sport %d --to-source %s", ntohs(server_addr.sin_port), inet_ntoa(p_addr.sin_addr));
-	printf("%s\n", Snat);	
-	system(Snat);
-
-	// int server_fd;
- //    //Finally, connect to the server
- //  	server_fd = connect(server, (struct sockaddr *) &d_addr, d_addrlen);
- //    if (server_fd == -1)
- //    	exit(1);
-
-  	char *logfile;
-    char logs[MAX_BUFFER];
-    time_t currentTime;
-    currentTime = time(NULL);
-    //Getting the date and time
-	logfile = ctime(&currentTime);
-	//Replacing the new line character
-	logfile[strlen(logfile)-1] = ' ';
-	//Add the client's IP address to the logfile
-	strcat(logfile, inet_ntoa(p_addr.sin_addr));
-	//Convert the client's port number to a string
-	sprintf(logs, " %d ", ntohs(p_addr.sin_port));
-	strcat(logfile, logs);
-	//Add the server's IP address to the logfile
-	strcat(logfile, inet_ntoa(d_addr.sin_addr));
-	memset(logs, 0, MAX_BUFFER);
-	//Convert the server's port number to a string
-	sprintf(logs, " %d ", ntohs(d_addr.sin_port));
-	strcat(logfile, logs);
-
-	FILE * file = fopen("logging.txt", "a+");
-    fprintf(file, "%s\n", logfile);
-    fclose(file);
-
-	while ((read_size = recv(sock, &buf[len], (MAX_BUFFER-len), 0)) > 0)
-	{ 
-		char line[read_size];
-		strncpy(line, &buf[len], sizeof(line));
-		len += read_size;
-		line[read_size] = '\0';
-
-		printf("Found:  %s\n", line);
-		// send(server_fd, line, strlen(line), 0);
-	}
-
-
-}
+void *get_source_ip(struct sockaddr *);
 
 void set_up_dnat(struct sockaddr_in svr_addr)
 {
@@ -144,6 +46,92 @@ void set_up_dnat(struct sockaddr_in svr_addr)
     printf("calling iptables dnat: %s\n", Dnat);
     system(Dnat);
     printf("\nserver port %d: waiting for connections...\n", ntohs(svr_addr.sin_port));
+}
+
+
+void accept_request(int sock)
+{
+	char buf[MAX_BUFFER];
+	int read_size = 0, len = 0;
+    int server;
+
+	struct sockaddr_in svr_addr_2;
+    struct sockaddr_in server_addr;
+    struct sockaddr_in client_addr;
+    struct sockaddr_in destination_addr;
+	socklen_t server_len; 
+	socklen_t client_len; 
+	socklen_t destination_len; 
+	server_len = sizeof(struct sockaddr_in);
+	client_len = sizeof(struct sockaddr_in);			
+	destination_len = sizeof(struct sockaddr_in);
+
+	if ((server = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+	{
+		perror("\nserver: socket");
+		exit(-1);
+	}
+
+	svr_addr_2.sin_family = AF_INET;
+	svr_addr_2.sin_port = 0;
+	svr_addr_2.sin_addr.s_addr = INADDR_ANY; 
+	bzero(&svr_addr_2.sin_zero, 8);
+
+	if((bind(server, (struct sockaddr *) &svr_addr_2, sizeof(svr_addr_2))) == -1)
+	{
+		perror("bind: ");
+		exit(-1);
+	}
+
+	if((getsockopt(sock, SOL_IP, 80, (struct sockaddr *) &destination_addr, &destination_len)) == -1){
+		perror("getsockopt: ");
+		exit(-1);
+	}
+
+	if((getsockname(server, (struct sockaddr *) &server_addr, &server_len)) == -1){
+		perror("getsockname: ");
+		exit(-1);		
+	}
+
+	if((getpeername(sock, (struct sockaddr *) &client_addr, &client_len)) == -1){
+		perror("getpeername: ");
+		exit(-1);		
+	}
+
+	char Snat[MAX_BUFFER];
+	sprintf(Snat, "iptables -t nat -A POSTROUTING -p tcp -j SNAT --sport %d --to-source %s", ntohs(server_addr.sin_port), inet_ntoa(client_addr.sin_addr));
+	printf("%s\n", Snat);	
+	system(Snat);
+
+  	char *logfile;
+    char logs[MAX_BUFFER];
+    time_t currentTime;
+    currentTime = time(NULL);
+	logfile = ctime(&currentTime);
+	logfile[strlen(logfile)-1] = ' ';
+	strcat(logfile, inet_ntoa(client_addr.sin_addr));
+	sprintf(logs, " %d ", ntohs(client_addr.sin_port));
+	strcat(logfile, logs);
+	strcat(logfile, inet_ntoa(destination_addr.sin_addr));
+	memset(logs, 0, MAX_BUFFER);
+	sprintf(logs, " %d ", ntohs(destination_addr.sin_port));
+	strcat(logfile, logs);
+
+	FILE * file = fopen("logging.txt", "a+");
+    fprintf(file, "%s\n", logfile);
+    fclose(file);
+
+	while ((read_size = recv(sock, &buf[len], (MAX_BUFFER-len), 0)) > 0)
+	{ 
+		char line[read_size];
+		strncpy(line, &buf[len], sizeof(line));
+		len += read_size;
+		line[read_size] = '\0';
+
+		printf("Found:  %s\n", line);
+	}
+
+
 }
 
 int listenOnPort()
@@ -186,7 +174,7 @@ int listenOnPort()
 
         // if connection
         inet_ntop(their_addr.ss_family, 
-            get_in_addr((struct sockaddr *)&their_addr),
+            get_source_ip((struct sockaddr *)&their_addr),
             s, sizeof s);
         printf("server port %d: got connection from %s\n", port, s);
 
@@ -203,7 +191,7 @@ int listenOnPort()
 	close(sock);
 }
 
-void *get_in_addr(struct sockaddr *sa)
+void *get_source_ip(struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET)
         return &(((struct sockaddr_in*)sa)->sin_addr);
