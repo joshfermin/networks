@@ -64,6 +64,11 @@ void accept_request(int sock)
 		exit(-1);
 	}
 
+	if((getsockopt(sock, SOL_IP, 80, (struct sockaddr *) &d_addr, &d_addrlen)) == -1){
+		perror("getsockopt: ");
+		exit(-1);
+	}
+
 	if((getsockname(server, (struct sockaddr *) &server_addr, &s_addrlen)) == -1){
 		perror("getsockname: ");
 		exit(-1);		
@@ -74,21 +79,19 @@ void accept_request(int sock)
 		exit(-1);		
 	}
 
-	if((getsockopt(sock, SOL_IP, 80, (struct sockaddr *) &d_addr, &d_addrlen)) == -1){
-		perror("getsockopt: ");
-		exit(-1);
-	}
 
 	char Snat[MAX_BUFFER];
 	sprintf(Snat, "iptables -t nat -A POSTROUTING -p tcp -j SNAT --sport %d --to-source %s", ntohs(server_addr.sin_port), inet_ntoa(p_addr.sin_addr));
 	printf("%s\n", Snat);	
 	system(Snat);
 
-	int server_fd;
-    //Finally, connect to the server
-  	server_fd = connect(server, (struct sockaddr *) &d_addr, d_addrlen);
-    if (server_fd == -1)
-    	exit(1);
+	// int server_fd;
+ //    //Finally, connect to the server
+ //  	server_fd = connect(server, (struct sockaddr *) &d_addr, d_addrlen);
+ //    if (server_fd == -1)
+ //    	exit(1);
+
+
 
   	char *logfile;
     char logs[MAX_BUFFER];
@@ -110,6 +113,9 @@ void accept_request(int sock)
 	sprintf(logs, " %d ", ntohs(d_addr.sin_port));
 	strcat(logfile, logs);
 
+	FILE * FileLog = fopen("logging.txt", "a+");
+    fprintf(FileLog, "%s", logfile);
+    fclose(FileLog);
 
 	while ((read_size = recv(sock, &buf[len], (MAX_BUFFER-len), 0)) > 0)
 	{ 
@@ -119,11 +125,10 @@ void accept_request(int sock)
 		line[read_size] = '\0';
 
 		printf("Found:  %s\n", line);
+		send(server_fd, line, strlen(line), 0);
 	}
 
-    FILE * FileLog = fopen("logging.txt", "a+");
-    fprintf(FileLog, "%s", logfile);
-    fclose(FileLog);
+
 }
 
 void set_up_dnat(struct sockaddr_in svr_addr)
